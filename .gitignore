@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# кэш внешних API и картинок (прогревается npm run warm)
+/.cache
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -39,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Android-демо внутри web — на GitHub не выкладываем (только сайт)
+/android

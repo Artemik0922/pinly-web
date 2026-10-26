@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pinly — веб-аналог Pinterest
 
-## Getting Started
+Фронтенд на Next.js: бесконечная лента-масонри, поиск, категории, страницы пинов и доски с сохранением (localStorage).
 
-First, run the development server:
+**Контент динамический:** лента и поиск подтягивают CC-изображения из [Openverse](https://api.openverse.org/v1/) (flickr, wikimedia и др.). Запросы кэшируются на диск (`.cache/`), картинки отдаются через собственный маршрут `/api/img` с дисковым кэшем. При недоступности API сайт прозрачный падает на локальные моки (`src/data/pins.ts`) — лента никогда не пустая.
+
+## Запуск
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install   # один раз
+npm run dev   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Сборка: `npm run build && npm start`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Что внутри
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/` — лента-масонри с инфинити-скроллом и фильтром по категориям (`/?category=…`)
+- `/pin/[id]` — страница пина: описание, автор, теги, похожие пины
+- `/search?q=…` — поиск по названию, описанию, тегам и категории
+- `/boards`, `/board/[id]` — доски: создание, удаление, коллажи превью
 
-## Learn More
+## Структура
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  data/pins.ts         — моки (fallback) + контракт типов Pin
+  lib/feed.ts          — серверный слой ленты: Openverse → fallback на моки
+  lib/providers/       — openverse.ts (API), cache.ts (кэш на диске),
+                         proxy.ts (/api/img)
+  lib/queries.ts       — поисковые запросы категорий
+  lib/store.tsx        — доски и сохранения, персист в localStorage
+  lib/api.ts           — клиентские помощники (/api/feed)
+  app/api/feed/route.ts, app/api/img/route.ts
+  components/          — Header, CategoryChips, MasonryGrid, PinCard,
+                         SaveControls, InfiniteFeed, PinDetail, Icons
+  app/                 — страницы (App Router)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Лимиты Openverse (анонимно: 20 зап/мин, 200/день) снимаются кэшем — один и тот же запрос бьёт в API один раз в сутки. Атрибуция автора и CC-лицензии показывается на странице пина (требование лицензий).
