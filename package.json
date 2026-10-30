@@ -16,7 +16,7 @@
     "warm": "node scripts/warm.mjs",
     "index": "node scripts/index-pins.mjs",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test:api": "python -m pytest backend/tests -q",
     "test:e2e": "playwright test"
   },
