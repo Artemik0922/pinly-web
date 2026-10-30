@@ -10,7 +10,10 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000",
+    // http://localhost, а не 127.0.0.1: Next 16 блокирует dev-ресурсы по
+    // чужому origin, гидрация не доходит, и каждый селектор клиентского
+    // компонента падает с «элемент не найден» вместо «сайт не гидратировался».
+    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     locale: "ru-RU",
     trace: "on-first-retry",
   },
@@ -19,7 +22,7 @@ export default defineConfig({
     ? undefined
     : {
         command: "npm run dev",
-        url: "http://127.0.0.1:3000",
+        url: "http://localhost:3000",
         reuseExistingServer: true,
         timeout: 180_000,
       },

@@ -4,20 +4,11 @@
 
 import Link from "next/link";
 import { useUser } from "@/lib/user";
+import { CATEGORY_PAGES, categoryHref } from "@/lib/categories";
 
-const CATS = [
-  "Все",
-  "Интерьер",
-  "Рецепты",
-  "Путешествия",
-  "Мода",
-  "Искусство",
-  "Природа",
-  "Архитектура",
-  "Рукоделие",
-  "Фитнес",
-  "Книги и рабочее место",
-];
+// Список берётся из CATEGORY_PAGES: чипс, маршрут /category/<slug> и sitemap
+// должны сходиться по именам, иначе часть категорий останется без индекса.
+const CATS = ["Все", ...CATEGORY_PAGES.map((page) => page.name)];
 
 export function CategoryChips({ active, feed }: { active?: string; feed?: string }) {
   const { user, enabled } = useUser();
@@ -51,7 +42,7 @@ export function CategoryChips({ active, feed }: { active?: string; feed?: string
         {CATS.map((cat) =>
           chip(
             cat,
-            cat === "Все" ? "/" : `/?category=${encodeURIComponent(cat)}`,
+            cat === "Все" ? "/" : categoryHref(cat),
             !subscriptions && (cat === "Все" ? !active : active === cat),
           ),
         )}

@@ -15,11 +15,17 @@ export function HomeFeed({
   feed,
   initialPins,
   initialCursor,
+  heading,
+  intro,
 }: {
   category?: string;
   feed?: string;
   initialPins?: Pin[];
   initialCursor?: number | null;
+  // Видимый заголовок нужен посадочной странице категории: без h1 страница
+  // для поисковика — набор картинок. На главной он остаётся скрытым.
+  heading?: string;
+  intro?: string;
 }) {
   const subscriptions = feed === "subscriptions";
 
@@ -30,11 +36,25 @@ export function HomeFeed({
 
   return (
     <>
-      {/* заголовок страницы есть у всех остальных маршрутов — здесь он
-          визуально скрыт, чтобы скринридер и поисковик понимали, что за лента */}
-      <h1 className="sr-only">{subscriptions ? "Лента подписок" : "Лента идей Pinly"}</h1>
+      {/* на главной заголовок скрыт (лента говорит сама за себя), у
+          посадочной страницы категории он видимый: без h1 страница для
+          поисковика — набор картинок */}
+      <h1
+        className={
+          heading
+            ? "mx-auto w-full max-w-[1800px] px-4 pt-4 text-3xl font-extrabold"
+            : "sr-only"
+        }
+      >
+        {heading ?? (subscriptions ? "Лента подписок" : "Лента идей Pinly")}
+      </h1>
       <CategoryChips active={category} feed={feed} />
       <div className="mx-auto w-full max-w-[1800px] px-4">
+        {intro && (
+          <p className="max-w-3xl pb-6 text-sm leading-relaxed text-muted sm:text-[15px]">
+            {intro}
+          </p>
+        )}
         {subscriptions ? (
           <SubscriptionsFeed />
         ) : (

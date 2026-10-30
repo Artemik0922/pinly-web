@@ -9,6 +9,7 @@ import { useState } from "react";
 import type { Pin } from "@/data/pins";
 import { CATEGORIES } from "@/data/pins";
 import { apiDeletePin, apiUpdatePin } from "@/lib/account";
+import { categoryHref } from "@/lib/categories";
 import { countLabel } from "@/lib/plural";
 import { PinImage } from "@/components/PinCard";
 import { Avatar } from "@/components/Avatar";
@@ -375,7 +376,7 @@ export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
           )}
 
           <Link
-            href={`/?category=${encodeURIComponent(pin.category)}`}
+            href={categoryHref(pin.category)}
             className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-background px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-black/5 hover:bg-surface"
           >
             {pin.category}

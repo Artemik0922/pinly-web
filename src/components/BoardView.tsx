@@ -16,6 +16,7 @@ import { pinCountLabel, boardPinCount } from "@/lib/plural";
 import { IconCompass, IconInbox, IconLock, IconPencil, IconShare } from "@/components/Icons";
 import { ConfirmDialog } from "@/components/Confirm";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { BoardStats } from "@/components/BoardStats";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/track";
 
@@ -88,19 +89,30 @@ export function BoardView({ id }: { id: string }) {
     // клиенту одним сообщением. Секретную доску отправить нельзя, поэтому
     // кнопка честно говорит, что включить, вместо тихого копирования
     // мёртвой ссылки.
+    //
+    // Пометка ?from= нужна, чтобы различить каналы: в мессенджерах Referer
+    // теряется чаще, чем доживает, и без метки весь чужой трафик выглядит
+    // как «напрямую».
+    const withMark = (mark: string) => {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("from")) url.searchParams.set("from", mark);
+      return url.toString();
+    };
+
     const shareBoard = async () => {
-      const url = window.location.href;
       if (board.isSecret) {
         toast.show("Доска скрыта — чтобы отправить ссылку, выключите «Скрытая от всех»");
         return;
       }
       track.shareCopy(board.id);
       if (navigator.share) {
-        navigator.share({ title: board.title, text: "Мои работы", url }).catch(() => undefined);
+        navigator
+          .share({ title: board.title, text: "Мои работы", url: withMark("share") })
+          .catch(() => undefined);
         return;
       }
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(withMark("link"));
         toast.show("Ссылка на доску скопирована");
       } catch {
         toast.show("Браузер не дал скопировать ссылку");
@@ -180,6 +192,11 @@ export function BoardView({ id }: { id: string }) {
             </button>
           </div>
         </div>
+
+        {/* сводка видна только владельцу доски: в этой ветке board есть всегда,
+            а чужая доска рисуется ниже, без цифр. В анонимном режиме (без
+            бэкенда) просить нечего — счётчиков события не существуют */}
+        {user && <BoardStats boardId={board.id} />}
 
         <ConfirmDialog
           open={confirmDelete}

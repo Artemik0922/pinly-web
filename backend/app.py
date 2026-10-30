@@ -54,6 +54,7 @@ try:
     from backend.mealdb import register_mealdb
     from backend.notifications import register_notifications
     from backend.social import register_social
+    from backend.seo import register_seo
 except ImportError:  # запуск из каталога backend/
     from accounts import DATA_DIR, _db, register_accounts
     from cache import CACHE_DIR, cached
@@ -64,6 +65,7 @@ except ImportError:  # запуск из каталога backend/
     from mealdb import register_mealdb
     from notifications import register_notifications
     from social import register_social
+    from seo import register_seo
 
 WEB_ROOT = Path(__file__).resolve().parent.parent
 
@@ -164,6 +166,8 @@ register_social(app)
 register_mealdb(app)
 register_notifications(app)
 register_events(app)
+# /api/seo/urls — адреса для sitemap.ts (см. seo.py)
+register_seo(app)
 
 # --- env из web/.env.local (простая загрузка, без внешних зависимостей) ---
 

@@ -115,7 +115,12 @@ test("доска отдаёт превью для мессенджера и кн
   // порт берём из текущего адреса, иначе проверка привязана к 3000 и падает
   // на любом другом порту (прод-сборка, CI, параллельный запуск)
   const origin = new URL(page.url()).origin;
-  expect(await page.evaluate("navigator.clipboard.readText()")).toBe(`${origin}${boardPath}`);
+  // в ссылке обязана быть пометка канала: без неё весь трафик из чатов
+  // прилетает в сводку как «напрямую», и «привёл мастер людей или нет»
+  // становится неизмеримо
+  expect(await page.evaluate("navigator.clipboard.readText()")).toBe(
+    `${origin}${boardPath}?from=link`,
+  );
 });
 
 test("браузер считает визит и приход на доску по метке источника", async ({ page }) => {
@@ -147,4 +152,76 @@ test("браузер считает визит и приход на доску �
   expect(summary.events.some((e: { name: string }) => e.name === "visit")).toBe(true);
   expect(summary.events.some((e: { name: string }) => e.name === "board_created")).toBe(true);
   expect(summary.boardViewSources.some((s: { source: string }) => s.source === "vk")).toBe(true);
+});
+
+test("у категории есть постоянный адрес для поиска", async ({ page, request }) => {
+  // Реклама кормится показами, показы — входом извне. Значит у ленты по
+  // категории должен быть адрес, который можно отдать краулеру: со своим
+  // заголовком, h1 в серверном HTML и каноником, не дублирующим главную.
+  const res = await request.get("/category/interior");
+  expect(res.ok()).toBe(true);
+  const html = await res.text();
+  expect(html).toContain("Интерьер");
+  expect(html).toMatch(/<h1[^>]*>Интерьер/);
+  const canonical = html.match(/rel="canonical" href="([^"]+)"/)?.[1];
+  expect(canonical).toBeTruthy();
+  expect(new URL(canonical!).pathname).toBe("/category/interior");
+
+  // старый query-адрес остаётся живым (ссылки уже разосланы), но каноник
+  // ведёт на чистый URL — иначе десять лент склеиваются в дубли
+  const query = await request.get(`/?category=${encodeURIComponent("Рецепты")}`);
+  expect(query.ok()).toBe(true);
+  const queryCanonical = (await query.text()).match(/rel="canonical" href="([^"]+)"/)?.[1];
+  expect(new URL(queryCanonical!).pathname).toBe("/category/recepty");
+
+  // чипс над лентой ведут на чистые адреса
+  await page.goto("/category/recepty", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("link", { name: "Интерьер" })).toHaveAttribute(
+    "href",
+    "/category/interior",
+  );
+
+  // выдуманная категория не должна попадать в индекс. Статус при этом 200:
+  // под PPR оболочка уходит раньше, чем доходит до notFound(), и Next сам
+  // добавляет странице noindex — проверяем именно его
+  const bogus = await request.get("/category/net-takoi");
+  expect(bogus.ok()).toBe(true);
+  expect(await bogus.text()).toContain('content="noindex"');
+});
+
+test("мастер видит цифры своей доски", async ({ page, browser }) => {
+  // Главное допущение продукта — «расшаренная доска приводит чужих людей».
+  // Проверка, что мастеру это видно на его же доске, а не только владельцу
+  // сайта в сводке.
+  const title = `Цифры ${stamp}`;
+
+  await page.goto("/signup");
+  await page.getByLabel("Имя", { exact: true }).fill("Мастер Цифр");
+  await page.getByLabel("Email", { exact: true }).fill(`stats${stamp}@example.test`);
+  await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await expect(page).toHaveURL("/");
+
+  await page.goto("/boards");
+  await page.getByPlaceholder("Название новой доски…").fill(title);
+  await page.getByRole("button", { name: "Создать", exact: true }).click();
+  const link = page.locator('main a[href^="/board/"]').filter({ hasText: title });
+  await expect(link).toHaveAttribute("href", /^\/board\/[0-9a-f-]{36}$/);
+
+  await page.goto((await link.getAttribute("href"))!, { waitUntil: "domcontentloaded" });
+  const panel = page.getByText("Цифры доски");
+  await expect(panel).toBeVisible({ timeout: 40_000 });
+  await panel.click();
+  // открывал доску пока только сам мастер — чужих открытий быть не должно,
+  // и панель обязана сказать это прямо, а не нарисовать единицу
+  await expect(page.getByText(/открывали только вы/)).toBeVisible();
+  expect(await page.locator("details").textContent()).not.toContain("testclient");
+
+  // чужая доска цифр не показывает: гость видит её как read-only
+  const boardUrl = page.url();
+  const anon = await browser.newPage();
+  await anon.goto(boardUrl, { waitUntil: "domcontentloaded" });
+  await expect(anon.getByText("Цифры доски")).toHaveCount(0);
+  await anon.close();
 });

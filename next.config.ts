@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
         // События продукта: POST принимает бэкенд (пишет в свою SQLite).
         { source: "/api/ev", destination: `${backend}/api/ev` },
         { source: "/api/ev/summary", destination: `${backend}/api/ev/summary` },
+        { source: "/api/ev/board", destination: `${backend}/api/ev/board` },
         { source: "/api/media/:path*", destination: `${backend}/api/media/:path*` },
         { source: "/api/comments/:path*", destination: `${backend}/api/comments/:path*` },
         { source: "/api/pin/:pid/comments", destination: `${backend}/api/pin/:pid/comments` },

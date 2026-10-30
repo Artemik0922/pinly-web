@@ -20,9 +20,25 @@ from datetime import date
 from fastapi import HTTPException, Request, Response
 
 try:
-    from backend.accounts import SESSION_COOKIE, _client_ip, _db, _jwt_decode, _secret, rate_limit
+    from backend.accounts import (
+        SESSION_COOKIE,
+        _client_ip,
+        _current_user_row,
+        _db,
+        _jwt_decode,
+        _secret,
+        rate_limit,
+    )
 except ImportError:  # запуск из каталога backend/
-    from accounts import SESSION_COOKIE, _client_ip, _db, _jwt_decode, _secret, rate_limit
+    from accounts import (
+        SESSION_COOKIE,
+        _client_ip,
+        _current_user_row,
+        _db,
+        _jwt_decode,
+        _secret,
+        rate_limit,
+    )
 
 SCHEMA = """
 create table if not exists events (
@@ -178,4 +194,77 @@ def register_events(app):
                 {"source": r["source"], "count": r["c"], "visitors": r["visitors"]} for r in sources
             ],
             "boardViewReferrers": [{"host": r["ref_host"], "count": r["c"]} for r in refs],
+        }
+
+    @app.get("/api/ev/board")
+    def event_board(request: Request, board: str = "", days: int = 14):
+        """Цифры по одной доске — только её владельцу.
+
+        Мастеру нужен не общий трафик сайта, а ответ на один вопрос: привела ли
+        расшаренная ссылка чужих людей. Поэтому свои просмотры отделены от
+        чужих (иначе человек меряет себя), а в ответе только счётчики: хеш
+        посетителя, ip и реферер наружу не уходят.
+        """
+        me = _current_user_row(request)
+        board_id = _clean(board)
+        if not board_id:
+            raise HTTPException(400, "board required")
+        window = max(1, min(int(days or 14), 90))
+        since = f"-{window - 1} days"
+        external = "(user_id is null or user_id != ?)"
+        with _db() as conn:
+            owner = conn.execute("select user_id from boards where id = ?", (board_id,)).fetchone()
+            if owner is None:
+                raise HTTPException(404, "board not found")
+            if owner["user_id"] != me["id"]:
+                raise HTTPException(403, "not your board")
+            # один проход по дням: всего показов, чужих, чужих уникальных и своих
+            rows = conn.execute(
+                "select day,"
+                " count(*) as views,"
+                f" sum(case when {external} then 1 else 0 end) as foreign_views,"
+                f" count(distinct case when {external} then visitor end) as visitors"
+                " from events where name = 'board_view' and board_id = ?"
+                " and day >= date('now', ?)"
+                " group by day order by day desc",
+                (me["id"], me["id"], board_id, since),
+            ).fetchall()
+            channels = conn.execute(
+                "select coalesce(source, ref_host, 'напрямую') as channel,"
+                " count(*) as views, count(distinct visitor) as visitors"
+                " from events where name = 'board_view' and board_id = ?"
+                f" and day >= date('now', ?) and {external}"
+                " group by channel order by views desc limit 8",
+                (board_id, since, me["id"]),
+            ).fetchall()
+            shares = conn.execute(
+                "select count(*) as c from events"
+                " where name = 'share_copy' and board_id = ? and day >= date('now', ?)",
+                (board_id, since),
+            ).fetchone()["c"]
+        return {
+            "board": board_id,
+            "days": window,
+            "daily": [
+                {
+                    "day": r["day"],
+                    "views": r["views"],
+                    "foreignViews": r["foreign_views"],
+                    "visitors": r["visitors"],
+                }
+                for r in rows
+            ],
+            "totals": {
+                "views": sum(r["views"] for r in rows),
+                "foreignViews": sum(r["foreign_views"] for r in rows),
+                # уникальные считаются по дням: хеш посетителя привязан к дате,
+                # поэтому за окно это человеко-дни, а не люди
+                "visitorDays": sum(r["visitors"] for r in rows),
+                "activeDays": sum(1 for r in rows if r["foreign_views"] > 0),
+                "shares": shares,
+            },
+            "sources": [
+                {"channel": r["channel"], "views": r["views"], "visitors": r["visitors"]}
+                for r in channels
+            ],
         }
