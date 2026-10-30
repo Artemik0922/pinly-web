@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
 
 # next.js
 /.next/
@@ -26,6 +28,10 @@
 
 # кэш внешних API и картинок (прогревается npm run warm)
 /.cache
+
+# локальные данные: база аккаунтов (e-mail, хеши паролей), секрет подписи
+# сессий и загруженные пользователями файлы — наружу не выкладываем
+/.data
 
 # debug
 npm-debug.log*
@@ -45,3 +51,7 @@ next-env.d.ts
 
 # Android-демо внутри web — на GitHub не выкладываем (только сайт)
 /android
+
+# python
+__pycache__/
+*.pyc

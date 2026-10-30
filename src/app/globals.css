@@ -1,35 +1,62 @@
 @import "tailwindcss";
 
-/* Акцентный цвет — меняется здесь. */
+/* Акцентный цвет — меняется здесь.
+   --accent — декоративный мятный (кольца фокуса, подложки, иконки на светлом).
+   --accent-strong — тот же тон, но достаточный контраста для белого текста
+   на кнопках и для текста-ссылок (WCAG AA ≥ 4.5:1). */
 :root {
   --accent: #2fbf9b; /* мятный */
+  --accent-strong: #0f7f66; /* текст и кнопки */
   --background: #ffffff;
   --foreground: #111111;
   --surface: rgba(0, 0, 0, 0.05);
   --surface-card: rgba(0, 0, 0, 0.03);
+  --surface-hover: rgba(0, 0, 0, 0.07);
   --border: rgba(0, 0, 0, 0.08);
-  --muted: #6b7280;
+  --muted: #565f6b; /* 6.5:1 на белом — серый текст должен читаться */
+  --danger: #d92d20; /* 4.8:1 на белом; белый текст на этом же фоне — тоже AA */
+  --scrim: rgba(0, 0, 0, 0.45);
+  --elev-card: 0 6px 20px rgba(0, 0, 0, 0.14);
+  --elev-overlay: 0 16px 40px rgba(0, 0, 0, 0.22);
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] {
   --background: #0e0f11;
   --foreground: #ececec;
+  --accent-strong: #29b38f; /* на тёмном фоне белый текст не нужен, а этот тон читается */
   --surface: rgba(255, 255, 255, 0.08);
   --surface-card: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.12);
   --border: rgba(255, 255, 255, 0.1);
   --muted: #9ca3af;
+  --danger: #f87171; /* red-600 на тёмном фоне даёт 3:1 — для текста мало */
+  --scrim: rgba(0, 0, 0, 0.65);
+  --elev-card: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --elev-overlay: 0 16px 40px rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-card: var(--surface-card);
+  --color-surface-hover: var(--surface-hover);
   --color-border-soft: var(--border);
   --color-muted: var(--muted);
+  --color-danger: var(--danger);
+  --shadow-card: var(--elev-card);
+  --shadow-overlay: var(--elev-overlay);
+  --ease-pop: var(--motion-ease);
+  --animate-rise: rise 260ms var(--motion-ease) both;
+  --animate-pop: pop 180ms var(--motion-ease) both;
+  --animate-sink: sink 160ms ease-in both;
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* моноширинный не используется ни в одном компоненте —
+     системный стек вместо отдельного веб-шрифта */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 html {
@@ -44,7 +71,190 @@ html[data-theme="dark"] {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Видимый фокус у клавиатуры: без него вкладка в интерфейсе невидима.
+   Радиус здесь не трогаем — outline сам огибает скругление элемента, а
+   принудительный 999px превращал сфокусированную карточку в таблетку. */
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+/* Браузерный курсор у <button> — стрелка, поэтому кликабельность не читается. */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sink {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Стартовый экран (Splash в layout.tsx): закрывает страницу, пока грузятся
+   документ и шрифты. Виден при html[data-splash="on"] и "burst" — рой летучих мышей
+   вылетает из ещё непрозрачной заставки, и только в "hidden" она тает.
+   Если скрипт не запустился (JS выключен или упал), сайт не заперт. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--background);
+  color: var(--foreground);
+  opacity: 0;
+  visibility: hidden;
+  /* Задержка visibility равна длительности фейда: экран исчезает плавно
+     и только потом перестаёт перехватывать указатель и экранный обход */
+  transition: opacity 0.35s ease, visibility 0s linear 0.35s;
+}
+
+html[data-splash="on"] .splash,
+html[data-splash="burst"] .splash {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.35s ease;
+}
+
+/* Пока заставка видна, страницу под ней не прокручиваем */
+html[data-splash="on"] body,
+html[data-splash="burst"] body {
+  overflow: hidden;
+}
+
+.splash-badge {
+  display: block;
+  width: 64px;
+  height: 64px;
+  animation: splash-breathe 1.6s ease-in-out infinite;
+}
+
+.splash-logo {
+  width: 100%;
+  height: 100%;
+}
+
+.splash-word {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+@keyframes splash-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.9);
+  }
+}
+
+/* Рой летучих мышей (IconBat в Splash.tsx): вылетает из центра заставки в
+   фазе burst. Слой живёт вне .splash и стоит над ней, поэтому мышей видно
+   поверх непрозрачной заставки, а сама она тает только после полёта. */
+.bats-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+}
+
+.bat-fly {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  /* both: до старта мышь прозрачна, после — не возвращается в видимую точку */
+  animation: bats-fly 1.6s var(--motion-ease) both;
+  animation-delay: var(--delay, 0s);
+}
+
+/* Нос мыши смотрит вдоль +X, обёртка уже повёрнута по углу полёта;
+   покачивание поверх разлёта читается как живой машущий полёт */
+.bat-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--size, 24px);
+  height: auto;
+  animation: bat-flap 0.32s ease-in-out infinite alternate;
+}
+
+@keyframes bats-fly {
+  0% {
+    transform: rotate(var(--angle)) translateX(0) scale(0.3);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--angle)) translateX(var(--dist)) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes bat-flap {
+  from {
+    transform: translateY(-50%) rotate(-14deg) scale(0.92);
+  }
+  to {
+    transform: translateY(-64%) rotate(14deg);
+  }
+}
+
+
+/* Заглушка карточки, пока картинка источника не загрузилась */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
 }
 
 /* Плавная смена темы без переполоха на первых кадрах */
@@ -53,5 +263,17 @@ body {
   header,
   main {
     transition: background-color 0.25s ease, color 0.25s ease;
+  }
+}
+
+/* По просьбе «меньше движения» глушим анимации и сдвиги целиком */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

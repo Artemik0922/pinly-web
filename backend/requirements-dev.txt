@@ -1,0 +1,3 @@
+# Тестовый контур: pytest + TestClient (httpx уже в основных зависимостях)
+-r requirements.txt
+pytest==8.4.2

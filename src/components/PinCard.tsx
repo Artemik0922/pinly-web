@@ -1,68 +1,125 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- внешние картинки picsum,
-   для моков проще обычный img с width/height, чтобы не настраивать next/image */
+// Карточка пина в ленте: картинка в пропорции источника, ховер-оверлей с
+// быстрым сохранением и названием.
 
+import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { pinImageUrl, type Pin } from "@/data/pins";
+import { memo, useState } from "react";
+import { pinImageSize, pinImageUrl, type Pin } from "@/data/pins";
 import { SaveControls } from "@/components/SaveControls";
-import { IconImage } from "@/components/Icons";
 
-// Цвет заглушки, если picsum недоступен: стабильный оттенок по категории.
-function fallbackHue(category: string): number {
-  let h = 0;
-  for (const ch of category) h = (h * 31 + ch.codePointAt(0)!) % 360;
-  return h;
-}
+// Пропорции карточек в masonry: 2 колонки на мобильном → 5 на широком экране.
+export const CARD_SIZES =
+  "(max-width: 640px) 48vw, (max-width: 1024px) 31vw, (max-width: 1280px) 24vw, 19vw";
 
-export function PinImage({ pin }: { pin: Pin }) {
+export function PinImage({
+  pin,
+  preload = false,
+  priority = false,
+  onError,
+  sizes = CARD_SIZES,
+  className = "w-full rounded-2xl",
+}: {
+  pin: Pin;
+  // preload = приоритет: fetchpriority=high + eager + <link rel=preload>.
+  // Его дают карточкам над первым экраном; остальным — lazy.
+  preload?: boolean;
+  // priority = eager + fetchpriority=high. Docs этой версии прямо советуют
+  // его вместо preload для картинок над экраном: <link rel=preload> на каждую
+  // карточку конкурирует за канал с CSS и JS.
+  priority?: boolean;
+  sizes?: string;
+  className?: string;
+  // Ошибка известна не только картинке: карточка без неё оставила бы пустую
+  // ячейку с висящим оверлеем.
+  onError?: () => void;
+}) {
   const [error, setError] = useState(false);
+  const src = pinImageUrl(pin);
+  const [w, h] = pinImageSize(pin);
+  // Абсолютный URL — это моки через weserv: их берёт сам браузер, потому
+  // что сервер до weserv не достучится (оптимизатор next/image качает
+  // картинку на своей стороне и вернул бы 504). Внутренние пути /api/img и
+  // /api/uploads оптимизируются — это и есть основная экономия трафика.
+  const external = src.startsWith("http");
+  const ratio = { aspectRatio: `${w} / ${h}` };
 
+  // Никаких цветных заглушек: битая картинка — это отсутствие картинки.
   if (error) {
-    return (
-      <div
-        style={{ aspectRatio: `${pin.width} / ${pin.height}`, background: `hsl(${fallbackHue(pin.category)} 55% 82%)` }}
-        className="grid w-full place-items-center rounded-2xl"
-      >
-        <IconImage size={28} className="text-muted opacity-50" />
-      </div>
-    );
+    return null;
   }
 
   return (
-    <img
-      src={pinImageUrl(pin)}
-      alt={pin.title}
-      width={pin.width}
-      height={pin.height}
-      loading="lazy"
-      onError={() => setError(true)}
-      className="w-full rounded-2xl"
-    />
+    // Коробка с aspect-ratio резервирует место всегда: картинка доезжает и
+    // вставляется в уже готовую ячейку, сетка не перетекает.
+    <div style={ratio} className="w-full overflow-hidden rounded-2xl">
+      <Image
+        src={src}
+        alt={pin.title}
+        width={w}
+        height={h}
+        sizes={sizes}
+        unoptimized={external}
+        preload={preload}
+        fetchPriority={priority || preload ? "high" : undefined}
+        loading={preload || priority ? "eager" : "lazy"}
+        onError={() => {
+          setError(true);
+          onError?.();
+        }}
+        className={className}
+      />
+    </div>
   );
 }
 
-export function PinCard({ pin }: { pin: Pin }) {
+export const PinCard = memo(function PinCard({
+  pin,
+  priority = false,
+  preload = false,
+}: {
+  pin: Pin;
+  priority?: boolean;
+  preload?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  // Битая картинка — это отсутствие карточки. А вот «ещё не загрузилась»
+  // прятать перестали: раньше карточка висела в display:none до готовности
+  // и опрашивала себя каждые 150 мс. В колонках это означало, что первые N
+  // карточек появляются одним блоком и пересобирают раскладку (в профиле —
+  // reflow на 55 мс и 453 узла). Место уже зарезервировано aspect-ratio у
+  // коробки, поэтому достаточно не рисовать то, что упало.
+  if (failed) return null;
+
   return (
     <div className="group relative">
-      <Link href={`/pin/${pin.id}`} className="block cursor-zoom-in">
-        <div className="overflow-hidden rounded-2xl transition-shadow duration-200 group-hover:shadow-lg group-hover:shadow-black/20">
-          <div className="transition-transform duration-200 group-hover:scale-[1.02]">
-            <PinImage pin={pin} />
+      <Link
+        href={`/pin/${pin.id}`}
+        className="block cursor-zoom-in rounded-2xl outline-offset-4 transition-transform duration-200 ease-pop active:scale-[0.97]"
+      >
+        <div className="overflow-hidden rounded-2xl shadow-card transition-shadow duration-200 group-hover:shadow-overlay">
+          <div className="transition-transform duration-200 ease-pop group-hover:scale-[1.02]">
+            <PinImage pin={pin} priority={priority} preload={preload} onError={() => setFailed(true)} />
           </div>
         </div>
       </Link>
+      {/* Затемнение — только там, где есть ховер. Градиент снизу, а не
+          плоская маска: картинка остаётся видно, а название читается.
+          На тач-устройствах скрима нет — там подпись в своей плашке. */}
+      <div className="pointer-events-none absolute inset-0 hidden rounded-2xl bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 sm:block" />
 
-      {/* Ховер-оверлей: затемнение, быстрое сохранение, название */}
-      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-black/40 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+      {/* Действия: на тач-устройствах видны всегда, на десктопе — по ховеру
+          или фокусу клавиатурой (иначе «Сохранить» недостижим) */}
+      <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-150 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 max-sm:pointer-events-auto max-sm:opacity-100">
         <div className="absolute right-2 top-2" onClick={(e) => e.preventDefault()}>
           <SaveControls pin={pin} />
         </div>
-        <p className="absolute bottom-2 left-3 right-3 truncate text-sm font-semibold text-white drop-shadow">
+        <p className="absolute inset-x-2 bottom-2 truncate rounded-full bg-black/45 px-3 py-1 text-sm font-semibold text-white sm:inset-x-3 sm:bg-transparent sm:px-0 sm:py-0 sm:drop-shadow">
           {pin.title}
         </p>
       </div>
     </div>
   );
-}
+});

@@ -1,32 +1,65 @@
 "use client";
 
-// Горизонтальная лента чипсов категорий над лентой.
+// Горизонтальная лента чипсов над лентой: подписки (для вошедших) и категории.
 
 import Link from "next/link";
+import { useUser } from "@/lib/user";
 
-export function CategoryChips({ active }: { active?: string }) {
-  const cats = ["Все", "Интерьер", "Рецепты", "Путешествия", "Мода", "Искусство", "Природа", "Архитектура", "Рукоделие", "Фитнес", "Книги и рабочее место"];
+const CATS = [
+  "Все",
+  "Интерьер",
+  "Рецепты",
+  "Путешествия",
+  "Мода",
+  "Искусство",
+  "Природа",
+  "Архитектура",
+  "Рукоделие",
+  "Фитнес",
+  "Книги и рабочее место",
+];
+
+export function CategoryChips({ active, feed }: { active?: string; feed?: string }) {
+  const { user, enabled } = useUser();
+  const subscriptions = feed === "subscriptions";
+
+  const chip = (label: string, href: string, isActive: boolean) => (
+    <li key={label} className="shrink-0">
+      <Link
+        href={href}
+        scroll={false}
+        aria-current={isActive ? "page" : undefined}
+        className={`flex min-h-11 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
+          isActive
+            ? "bg-foreground text-white"
+            : "bg-surface text-foreground hover:bg-surface-hover"
+        }`}
+      >
+        {label}
+      </Link>
+    </li>
+  );
 
   return (
-    <nav className="mx-auto w-full max-w-[1800px] px-4 py-3">
-      <ul className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {cats.map((cat) => {
-          const isActive = cat === "Все" ? !active : active === cat;
-          const href = cat === "Все" ? "/" : `/?category=${encodeURIComponent(cat)}`;
-          return (
-            <li key={cat} className="shrink-0">
-              <Link
-                href={href}
-                className={`block rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
-                  isActive ? "bg-black text-white" : "bg-surface text-foreground hover:bg-surface"
-                }`}
-              >
-                {cat}
-              </Link>
-            </li>
-          );
-        })}
+    <nav aria-label="Категории ленты" className="relative mx-auto w-full max-w-[1800px] px-4 py-1">
+      {/* градиент справа подсказывает, что ленту чипсов можно крутить */}
+      <ul
+        className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ scrollSnapType: "x proximity" }}
+      >
+        {enabled && user && chip("Подписки", "/?feed=subscriptions", subscriptions)}
+        {CATS.map((cat) =>
+          chip(
+            cat,
+            cat === "Все" ? "/" : `/?category=${encodeURIComponent(cat)}`,
+            !subscriptions && (cat === "Все" ? !active : active === cat),
+          ),
+        )}
       </ul>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-1 right-0 w-10 bg-gradient-to-l from-background to-transparent sm:hidden"
+      />
     </nav>
   );
 }

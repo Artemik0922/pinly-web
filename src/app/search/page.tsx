@@ -11,25 +11,37 @@ import { MasonryGrid } from "@/components/MasonryGrid";
 import { CategoryChips } from "@/components/CategoryChips";
 import { IconQuestion } from "@/components/Icons";
 
+type Result = { q: string; pins: Pin[] };
+
 function SearchResults() {
   const params = useSearchParams();
   const q = params.get("q") ?? "";
-  const [pins, setPins] = useState<Pin[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<Result | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    searchPins(q).then((result) => {
-      if (!cancelled) {
-        setPins(result);
-        setLoading(false);
-      }
-    });
+    if (!q.trim()) return;
+    const controller = new AbortController();
+    let settled = false;
+    searchPins(q, controller.signal)
+      .then((pins) => {
+        if (settled) return;
+        setResult({ q, pins });
+        setError(null);
+      })
+      .catch(() => {
+        if (!settled) setError("Поиск не выполнился — сервер ленты недоступен.");
+      });
     return () => {
-      cancelled = true;
+      settled = true;
+      controller.abort();
     };
-  }, [q]);
+  }, [q, attempt]);
+
+  // Ответ ещё не по текущему запросу — значит ищем.
+  const loading = !error && result?.q !== q;
+  const pins = result?.q === q ? result.pins : [];
 
   return (
     <>
@@ -37,18 +49,35 @@ function SearchResults() {
       <div className="mx-auto w-full max-w-[1800px] px-4">
         <h1 className="py-2 text-lg font-bold">
           {q ? `Поиск: «${q}»` : "Что ищем?"}
-          {pins.length > 0 && <span className="ml-2 font-normal text-muted/80">{pins.length}</span>}
+          {pins.length > 0 && <span className="ml-2 font-normal text-muted">{pins.length}</span>}
         </h1>
 
-        {loading && <p className="py-10 text-center text-sm text-muted/80">Ищем…</p>}
+        {loading && <p className="py-10 text-center text-sm text-muted">Ищем…</p>}
 
-        {!loading && pins.length > 0 && (
+        {error && (
+          <div className="py-10 text-center text-sm">
+            <p className="text-danger" role="alert">{error}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setResult(null);
+                setAttempt((n) => n + 1);
+              }}
+              className="mt-3 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
+            >
+              Повторить
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && pins.length > 0 && (
           <div className="mt-4">
             <MasonryGrid pins={pins} />
           </div>
         )}
 
-        {!loading && q && pins.length === 0 && (
+        {!loading && !error && q && pins.length === 0 && (
           <div className="py-16 text-center">
             <p className="grid place-items-center text-muted">
               <IconQuestion size={40} />
@@ -58,7 +87,7 @@ function SearchResults() {
             </p>
             <Link
               href="/"
-              className="mt-5 inline-block rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110"
+              className="mt-5 inline-block rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background hover:opacity-90"
             >
               Вернуться в ленту
             </Link>
@@ -71,7 +100,7 @@ function SearchResults() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<p className="py-10 text-center text-sm text-muted/80">Загрузка…</p>}>
+    <Suspense fallback={<p className="py-10 text-center text-sm text-muted">Загрузка…</p>}>
       <SearchResults />
     </Suspense>
   );

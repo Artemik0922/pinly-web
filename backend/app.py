@@ -15,42 +15,155 @@
 #   pip install -r backend/requirements.txt
 #   python -m uvicorn backend.app:app --port 8000
 #
-# Env (как в .env.local): OPENVERSE_API_KEY, VOYAGE_API_KEY, VOYAGE_BASE_URL.
+# Env (как в .env.local): OPENVERSE_API_KEY, EMBED_API_KEY (или VOYAGE_API_KEY),
+# EMBED_MODEL, EMBED_DIMENSIONS, EMBED_BASE_URL.
 
-import asyncio
 import hashlib
 import json
-import math
+import logging
 import os
 import re
 import time
 import urllib.parse
+import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
+
+try:
+    from backend.accounts import DATA_DIR, _db, register_accounts
+    from backend.cache import CACHE_DIR, cached
+    from backend.events import register_events
+    from backend.embeddings import (
+        embed_texts,
+        embeddings_enabled,
+        search_vectors,
+        store,
+    )
+    from backend.images import detect_image_ext
+    from backend.pins import (
+        get_user_pin,
+        recent_user_pins,
+        register_pins,
+        search_user_pins,
+    )
+    from backend.mealdb import register_mealdb
+    from backend.notifications import register_notifications
+    from backend.social import register_social
+except ImportError:  # запуск из каталога backend/
+    from accounts import DATA_DIR, _db, register_accounts
+    from cache import CACHE_DIR, cached
+    from events import register_events
+    from embeddings import embed_texts, embeddings_enabled, search_vectors, store
+    from images import detect_image_ext
+    from pins import get_user_pin, recent_user_pins, register_pins, search_user_pins
+    from mealdb import register_mealdb
+    from notifications import register_notifications
+    from social import register_social
 
 WEB_ROOT = Path(__file__).resolve().parent.parent
-CACHE_DIR = WEB_ROOT / ".cache"
-CACHE_DIR.mkdir(exist_ok=True)
 
 PAGE_SIZE = 20
-CACHE_TTL_S = 24 * 60 * 60
-OPENVERSE_API = "https://api.openverse.org/v1/images"
-TIMEOUT_S = 20.0
+OPENVERSE_API = "https://api.openverse.org/v1/images/"  # slash обязателен: без него 301
+TIMEOUT_S = 8.0
 BROKEN_HOSTS = re.compile(r"images\.rawpixel\.com$")
-ALLOWED_IMG_HOSTS = re.compile(r"(staticflickr\.com|wikimedia\.org|flickr\.com)$")
+# Разрешённые хосты картинок живут в images.py (общие с pins.py)
+from backend.images import is_allowed_img_host  # noqa: E402
+MAX_IMG_BYTES = 15 * 1024 * 1024
+IMG_HEADERS = {
+    "Cache-Control": "public, max-age=31536000, immutable",
+    # содержимое приходит с чужого хоста — браузеру нечего угадывать
+    "X-Content-Type-Options": "nosniff",
+}
 RATIO = {"tall": "tall", "square": "square", "wide": "wide"}
 
-app = FastAPI(title="Pinly Python backend")
+log = logging.getLogger("pinly")
+
+
+def configure_logging() -> None:
+    """Один корневой логгер вместо молчаливых except по всему коду.
+
+    Формат с уровнем и именем модуля: в journalctl/логах VPS этого хватает,
+    чтобы найти причину, не включая трейсер.
+    """
+    level = os.environ.get("PINLY_LOG_LEVEL", "INFO").upper()
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    )
+    root = logging.getLogger()
+    if not root.handlers:
+        root.addHandler(handler)
+    root.setLevel(level)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    configure_logging()
+    store.load()
+    log.info("pinly backend ready (data dir %s)", DATA_DIR)
+    yield
+
+
+# Разрешённые источники запросов: по умолчанию локальный сайт, в проде
+# задаётся через PINLY_CORS_ORIGINS (через запятую).
+CORS_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("PINLY_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(
+        ","
+    )
+    if o.strip()
+]
+
+app = FastAPI(title="Pinly Python backend", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def access_log(request: Request, call_next):
+    """Request-id + длительность: без этого в логах нельзя связать жалобу
+    пользователя с конкретным запросом."""
+    path = request.url.path
+    request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    started = time.monotonic()
+    try:
+        response: Response = await call_next(request)
+    except Exception:
+        log.exception("%s %s -> 500 (%s)", request.method, path, request_id)
+        raise
+    ms = (time.monotonic() - started) * 1000
+    response.headers["X-Request-Id"] = request_id
+    # картинки не логируем: это шум, а не события приложения
+    if not path.startswith(("/api/uploads", "/api/img")):
+        log.info(
+            "%s %s -> %s %.0fms %s",
+            request.method,
+            path,
+            response.status_code,
+            ms,
+            request_id,
+        )
+    return response
+
+# Аккаунты: /api/auth/*, /api/boards*, /api/likes* (см. accounts.py).
+# Пины пользователей: /api/pins, /api/uploads/* (см. pins.py).
+# Соцблок: /api/users/*, комментарии, подписки (см. social.py).
+# Фронтенд попадает сюда через rewrites в next.config.ts.
+register_accounts(app)
+register_pins(app)
+register_social(app)
+register_mealdb(app)
+register_notifications(app)
+register_events(app)
 
 # --- env из web/.env.local (простая загрузка, без внешних зависимостей) ---
 
@@ -68,34 +181,6 @@ def load_dotenv(path: Path) -> None:
 
 load_dotenv(WEB_ROOT / ".env.local")
 
-# --- кэш: тот же формат и файлы, что у Node-версии ---
-
-_mem_cache: dict[str, tuple[float, object]] = {}
-
-def cache_path(key: str) -> Path:
-    safe = re.sub(r"[^a-zA-Z0-9_-]", "_", key)[:120]
-    return CACHE_DIR / f"{safe}.json"
-
-async def cached(key: str, fetcher):
-    now = time.time() * 1000
-    hit = _mem_cache.get(key)
-    if hit and now - hit[0] < CACHE_TTL_S:
-        return hit[1]
-    try:
-        entry = json.loads(cache_path(key).read_text(encoding="utf-8"))
-        if now - entry["at"] < CACHE_TTL_S:
-            _mem_cache[key] = (entry["at"], entry["data"])
-            return entry["data"]
-    except (OSError, KeyError, ValueError):
-        pass
-    data = await fetcher()
-    _mem_cache[key] = (now, data)
-    try:
-        cache_path(key).write_text(json.dumps({"at": now, "data": data}), encoding="utf-8")
-    except OSError:
-        pass
-    return data
-
 # --- мок-пины ---
 
 _pins_data = json.loads((Path(__file__).parent / "mock-pins.json").read_text(encoding="utf-8"))
@@ -106,85 +191,6 @@ def mock_page(category: str | None, cursor: int) -> dict:
     pins = source[cursor * PAGE_SIZE:(cursor + 1) * PAGE_SIZE]
     nxt = cursor + 1
     return {"pins": pins, "nextCursor": nxt if nxt * PAGE_SIZE < len(source) else None}
-
-# --- векторный магазин (.cache/vectors.json) ---
-
-class VectorStore:
-    def __init__(self) -> None:
-        self.items: list[dict] = []
-
-    def load(self) -> None:
-        try:
-            store = json.loads((CACHE_DIR / "vectors.json").read_text(encoding="utf-8"))
-            self.items = store.get("items", [])
-        except (OSError, ValueError):
-            self.items = []
-
-store = VectorStore()
-
-def search_vectors(vector: list[float], top_k: int, exclude_id: str | None = None):
-    scored = []
-    for it in store.items:
-        pin = it["pin"]
-        if pin.get("id") == exclude_id:
-            continue
-        scored.append((cosine(vector, it["vector"]), pin))
-    scored.sort(key=lambda s: -s[0])
-    return [{"score": sc, "pin": pin} for sc, pin in scored[:top_k]]
-
-def cosine(a: list[float], b: list[float]) -> float:
-    dot = na = nb = 0.0
-    for x, y in zip(a, b):
-        dot += x * y
-        na += x * x
-        nb += y * y
-    denom = math.sqrt(na) * math.sqrt(nb)
-    return dot / denom if denom else 0.0
-
-# --- эмбеддинги voyage (тот же ключ кэша, что у Node-версии) ---
-
-def fnv1a(text: str) -> str:
-    h = 0x811C9DC5
-    for ch in text.encode("utf-8"):
-        h ^= ch
-        h = (h * 0x01000193) & 0xFFFFFFFF
-    return base36(h)
-
-def base36(n: int) -> str:
-    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
-    out = ""
-    while n:
-        out = digits[n % 36] + out
-        n //= 36
-    return out or "0"
-
-def voyage_enabled() -> bool:
-    return bool(os.environ.get("VOYAGE_API_KEY"))
-
-async def embed_texts(texts: list[str]) -> list[list[float]] | None:
-    if not voyage_enabled():
-        return None
-    base = os.environ.get("VOYAGE_BASE_URL", "https://routerai.ru/api/v1")
-    async with httpx.AsyncClient(timeout=30) as client:
-        out: list[list[float] | None] = [None] * len(texts)
-        for i in range(0, len(texts), 32):
-            batch = texts[i:i + 32]
-            key = f"emb-batch:{fnv1a('\0'.join(batch))}"
-
-            async def call():
-                res = await client.post(
-                    f"{base}/embeddings",
-                    headers={"Authorization": f"Bearer {os.environ.get('VOYAGE_API_KEY')}"},
-                    json={"model": "voyageai/voyage-multimodal-3.5", "input": batch, "encoding_format": "float"},
-                )
-                res.raise_for_status()
-                data = res.json()
-                return [d["embedding"][:512] for d in data["data"]]
-
-            vectors = await cached(key, call)
-            for j in range(len(batch)):
-                out[i + j] = vectors[j]
-    return out  # type: ignore[return-value]
 
 # --- Openverse ---
 
@@ -198,6 +204,10 @@ async def fetch_json(client: httpx.AsyncClient, url: str) -> dict:
             res = await client.get(url, headers=headers)
             res.raise_for_status()
             return res.json()
+        except httpx.TimeoutException:
+            # источник не отвечает: вторая попытка только удваивает задержку,
+            # а fallback на моки есть и так
+            raise
         except (httpx.HTTPError, ValueError):
             if attempt == 1:
                 raise
@@ -244,7 +254,7 @@ async def search_openverse(query: str, page: int, page_size: int = 20) -> dict:
 async def get_openverse_pin(uuid: str) -> dict | None:
     async with httpx.AsyncClient(timeout=TIMEOUT_S, follow_redirects=True) as client:
         try:
-            img = await cached(f"ov-id:{uuid}", lambda: fetch_json(client, f"{OPENVERSE_API}/{uuid}"))
+            img = await cached(f"ov-id:{uuid}", lambda: fetch_json(client, f"{OPENVERSE_API}{uuid}"))
         except httpx.HTTPError:
             return None
     return normalize(img, "открытый контент")
@@ -254,7 +264,7 @@ async def get_openverse_related(uuid: str, fallback_query: str, limit: int = 12)
         try:
             data = await cached(
                 f"ov-rel:{uuid}",
-                lambda: fetch_json(client, f"{OPENVERSE_API}/{uuid}/related?page_size={limit}"),
+                lambda: fetch_json(client, f"{OPENVERSE_API}{uuid}/related?page_size={limit}"),
             )
             if data.get("results"):
                 return [p for p in (normalize(img, "похожее") for img in data["results"]) if p]
@@ -283,13 +293,23 @@ def queries_for(category: str | None) -> list[str]:
         return [q for qs in CATEGORY_QUERIES.values() for q in qs]
     return CATEGORY_QUERIES.get(category, [category])
 
+def merge_user_pins(user_pins: list[dict], page_pins: list[dict], limit: int = PAGE_SIZE) -> list[dict]:
+    """Пины пользователей идут первыми на странице, добор — из источника."""
+    seen = {p["id"] for p in user_pins}
+    out = list(user_pins)
+    for p in page_pins:
+        if p["id"] not in seen:
+            out.append(p)
+            seen.add(p["id"])
+    return out[:limit]
+
 async def get_feed_page(category: str | None = None, q: str | None = None, cursor: int = 0) -> dict:
     if q and q.strip():
         query = q.strip()
         lower = query.lower()
 
         # приоритет — векторный (смысловой) поиск
-        if voyage_enabled() and store.items:
+        if embeddings_enabled() and store.items:
             try:
                 embs = await embed_texts([query])
                 if embs and embs[0]:
@@ -299,10 +319,16 @@ async def get_feed_page(category: str | None = None, q: str | None = None, curso
             except Exception:
                 pass  # обычные ветки ниже
 
+        # свои пины по названию/описанию/тегам — наверх выдачи
+        user_hits = search_user_pins(query, 4)
+
         try:
             page = await search_openverse(query, cursor + 1, PAGE_SIZE)
             if page["pins"]:
-                return {"pins": page["pins"], "nextCursor": cursor + 1 if cursor + 1 < page["pageCount"] else None}
+                return {
+                    "pins": merge_user_pins(user_hits, page["pins"]),
+                    "nextCursor": cursor + 1 if cursor + 1 < page["pageCount"] else None,
+                }
         except httpx.HTTPError:
             pass
 
@@ -313,9 +339,13 @@ async def get_feed_page(category: str | None = None, q: str | None = None, curso
             or lower in p["category"].lower()
         ]
         pins = matches[cursor * PAGE_SIZE:(cursor + 1) * PAGE_SIZE]
-        return {"pins": pins, "nextCursor": cursor + 1 if (cursor + 1) * PAGE_SIZE < len(matches) else None}
+        return {
+            "pins": merge_user_pins(user_hits, pins),
+            "nextCursor": cursor + 1 if (cursor + 1) * PAGE_SIZE < len(matches) else None,
+        }
 
-    # лента: запросы категории по ротации
+    # лента: запросы категории по ротации; свежие загрузки — на первой странице
+    uploads = recent_user_pins(category, 6) if cursor == 0 else []
     queries = queries_for(category)
     query = queries[cursor % len(queries)]
     openverse_page = cursor // len(queries) + 1
@@ -323,18 +353,24 @@ async def get_feed_page(category: str | None = None, q: str | None = None, curso
         page = await search_openverse(query, openverse_page, PAGE_SIZE)
         if page["pins"]:
             last = openverse_page >= page["pageCount"]
-            return {"pins": page["pins"], "nextCursor": None if last else cursor + 1}
+            return {
+                "pins": merge_user_pins(uploads, page["pins"]),
+                "nextCursor": None if last else cursor + 1,
+            }
     except httpx.HTTPError:
         pass
-    return mock_page(category, cursor)
+    mock = mock_page(category, cursor)
+    return {"pins": merge_user_pins(uploads, mock["pins"]), "nextCursor": mock["nextCursor"]}
 
 async def get_pin_by_id(pin_id: str) -> dict | None:
+    if pin_id.startswith("up-"):
+        return get_user_pin(pin_id)
     if pin_id.startswith("ov-"):
         return await get_openverse_pin(pin_id[3:])
     return next((p for p in ALL_PINS if p["id"] == pin_id), None)
 
 async def get_related(pin: dict, limit: int = 12) -> list[dict]:
-    if voyage_enabled() and store.items:
+    if embeddings_enabled() and store.items:
         try:
             text = ". ".join([pin["title"], pin.get("description") or "", pin["category"], *pin["tags"]])
             embs = await embed_texts([text])
@@ -344,7 +380,12 @@ async def get_related(pin: dict, limit: int = 12) -> list[dict]:
                     return [h["pin"] for h in hits]
         except Exception:
             pass
-    if pin["id"].startswith("ov-"):
+    if pin["id"].startswith("up-"):
+        same_user = [p for p in recent_user_pins(pin["category"], limit + 1) if p["id"] != pin["id"]]
+        if same_user:
+            return same_user[:limit]
+        # своих пинов в категории больше нет — моки ниже
+    elif pin["id"].startswith("ov-"):
         query = pin["tags"][0] if pin["tags"] else " ".join(pin["title"].split()[:3]) or pin["category"]
         return await get_openverse_related(pin["id"][3:], query, limit)
     same_category = [p for p in ALL_PINS if p["id"] != pin["id"] and p["category"] == pin["category"]]
@@ -356,9 +397,12 @@ async def get_related(pin: dict, limit: int = 12) -> list[dict]:
 
 # --- маршруты ---
 
-@app.on_event("startup")
-def _startup() -> None:
-    store.load()
+@app.get("/healthz")
+def healthz():
+    """Healthcheck для контейнера и мониторинга: жив ли процесс и доступна ли БД."""
+    with _db() as conn:
+        conn.execute("select 1").fetchone()
+    return {"ok": True}
 
 @app.get("/api/feed")
 async def api_feed(
@@ -382,34 +426,85 @@ async def api_pin_related(pin_id: str, limit: int = Query(12, ge=1, le=50)):
         raise HTTPException(404, "pin not found")
     return {"pins": await get_related(pin, limit)}
 
-@app.get("/api/img")
-async def api_img(u: str = Query(...)):
+def _check_img_url(u: str) -> str:
+    """Проверить https-URL источника и вернуть хост.
+
+    Матчим домен или поддомен точно: поиск по хвосту пропускал evil-flickr.com,
+    а `wikimedia.org` в хвосте — любой хост, на него заканчивающийся.
+    """
     if not u.startswith("https://"):
         raise HTTPException(400, "bad url")
     host = urllib.parse.urlsplit(u).hostname or ""
-    if not ALLOWED_IMG_HOSTS.search(host):
+    if not is_allowed_img_host(host):
         raise HTTPException(403, "host not allowed")
+    return host
 
-    digest = hashlib.md5(u.encode("utf-8")).hexdigest()
-    file = CACHE_DIR / "img" / f"{digest}.bin"
-    if not file.exists():
-        file.parent.mkdir(parents=True, exist_ok=True)
-        # не следуем редиректам: он мог бы увести на неразрешённый хост
-        async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
-            try:
-                res = await client.get(u)
-            except httpx.HTTPError:
-                raise HTTPException(504, "fetch failed")
-            if 300 <= res.status_code < 400:
-                raise HTTPException(502, "upstream redirect")
-            if res.status_code >= 400:
-                raise HTTPException(502, f"upstream {res.status_code}")
-            try:
-                file.write_bytes(res.content)
-            except OSError:
-                return RedirectResponse(f"/api/img?u={urllib.parse.quote(u)}")  # не должно случиться
+
+async def _cached_img(u: str) -> Path:
+    """Оригинал картинки в дисковом кэше: скачивается ровно один раз на URL."""
+    file = CACHE_DIR / "img" / f"{hashlib.md5(u.encode('utf-8')).hexdigest()}.bin"
+    if file.exists():
+        return file
+    file.parent.mkdir(parents=True, exist_ok=True)
+    # не следуем редиректам: он мог бы увести на неразрешённый хост.
+    # UA описательный, как требует robot policy Wikimedia: маскировка
+    # под браузер у них даёт 403.
+    try:
+        async with httpx.AsyncClient(
+            timeout=TIMEOUT_S,
+            follow_redirects=False,
+            headers={"User-Agent": "Pinly demo image fetcher / contact: pinly@test.local"},
+        ) as client:
+            async with client.stream("GET", u) as res:
+                if 300 <= res.status_code < 400:
+                    raise HTTPException(502, "upstream redirect")
+                if res.status_code >= 400:
+                    raise HTTPException(502, f"upstream {res.status_code}")
+                media = res.headers.get("content-type", "").split(";")[0].strip()
+                if not media.startswith("image/"):
+                    raise HTTPException(502, "upstream is not an image")
+                body = bytearray()
+                async for chunk in res.aiter_bytes(64 * 1024):
+                    body += chunk
+                    # потолок: иначе один запрос забивает диск кэша
+                    if len(body) > MAX_IMG_BYTES:
+                        raise HTTPException(502, "image too large")
+    except httpx.HTTPError as err:
+        raise HTTPException(504, "fetch failed") from err
+    try:
+        file.write_bytes(bytes(body))
+    except OSError as err:
+        raise HTTPException(500, "could not cache image") from err
+    return file
+
+
+def _img_kind(file: Path) -> str:
+    """Тип по сигнатуре байтов: .bin не хранит заголовки апстрима."""
+    with file.open("rb") as fh:
+        return detect_image_ext(fh.read(16)) or "jpg"
+
+
+@app.get("/api/img")
+async def api_img(u: str = Query(...)):
+    _check_img_url(u)
+    file = await _cached_img(u)
+    kind = _img_kind(file)
     return FileResponse(
         file,
-        media_type="image/jpeg",
-        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        media_type=f"image/{'jpeg' if kind == 'jpg' else kind}",
+        headers=IMG_HEADERS,
+    )
+
+
+@app.get("/api/img/download")
+async def api_img_download(u: str = Query(...)):
+    """Скачать оригинал: тот же кэш, но с Content-Disposition: attachment."""
+    _check_img_url(u)
+    file = await _cached_img(u)
+    kind = _img_kind(file)
+    return FileResponse(
+        file,
+        media_type=f"image/{'jpeg' if kind == 'jpg' else kind}",
+        filename=f"pinly-{file.stem[:10]}.{kind}",
+        headers={**IMG_HEADERS, "Content-Disposition": f'attachment; filename="pinly-{file.stem[:10]}.{kind}"'},
     )

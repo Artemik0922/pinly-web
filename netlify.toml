@@ -1,0 +1,10 @@
+# Netlify: Next.js 16 собирается официальным рантаймом (@netlify/plugin-nextjs):
+# он поднимает SSR-страницы и API-роуты (/api/feed, /api/img) как функции,
+# статику отдаёт из .next. Python-бэкенда на Netlify нет — сайт работает
+# в анонимном режиме (доски и лайки в localStorage), это штатный сценарий.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

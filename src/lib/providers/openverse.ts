@@ -4,8 +4,13 @@
 import { cached } from "@/lib/providers/cache";
 import type { Pin } from "@/data/pins";
 
-const API = "https://api.openverse.org/v1/images";
-const TIMEOUT_MS = 20000; // первый запрос в этой сети медленный (DNS/TLS)
+// Slash в конце обязателен: без него API отвечает 301, и каждый запрос
+// стоит лишнего round-trip.
+const API = "https://api.openverse.org/v1/images/";
+// 8 с: обычный ответ Openverse — доли секунды, столько ждём только на
+// недоступный источник. Неудача уходит в адаптивный backoff кэша, и
+// следующие запросы сразу получают fallback на моки.
+const TIMEOUT_MS = 8000;
 
 async function fetchJson(url: string): Promise<unknown> {
   // Одна повторная попытка: холодный TLS-хендшейк иногда выходит
@@ -24,7 +29,10 @@ async function fetchJson(url: string): Promise<unknown> {
       if (!res.ok) throw new Error(`Openverse ${res.status} @ ${url}`);
       return res.json();
     } catch (err) {
-      if (attempt >= 1) throw err;
+      // Повтор оправдан только на сетевой ошибке (холодный DNS/TLS).
+      // Таймаут значит «источник не отвечает» — второй раз ждать вдвое дольше
+      // смысла нет: пусть сразу будет fallback на моки.
+      if (attempt >= 1 || (err as Error).name === "TimeoutError") throw err;
     }
   }
 }
@@ -88,6 +96,10 @@ export async function searchOpenverse(
   query: string,
   page: number, // 1-based
   pageSize = 20,
+  // Категория для показа: запрос ленты английский («cozy interior design»),
+  // а показывать пользователю надо русское имя категории. Без этого чип
+  // категории на странице пина вёл в ленту, которой не существует.
+  label?: string,
 ): Promise<OpenversePage> {
   const params = new URLSearchParams({
     q: query,
@@ -99,20 +111,25 @@ export async function searchOpenverse(
   });
   const data = await cached(
     `ov:${query}:${page}:${pageSize}`,
-    () => fetchJson(`${API}?${params}`) as Promise<{ result_count: number; page_count: number; results: OvImage[] }>,
+    () =>
+      fetchJson(`${API}?${params}`) as Promise<{
+        result_count: number;
+        page_count: number;
+        results: OvImage[];
+      }>,
   );
   const pageCount = Math.min(data.page_count ?? 1, 20); // глубокие страницы не нужны
   return {
-    pins: (data.results ?? []).map((img) => normalize(img, query)).filter((p): p is Pin => p !== null),
+    pins: (data.results ?? [])
+      .map((img) => normalize(img, label ?? query))
+      .filter((p): p is Pin => p !== null),
     pageCount: Math.max(pageCount, 1),
   };
 }
 
 export async function getOpenversePin(uuid: string): Promise<Pin | undefined> {
   try {
-    const img = await cached(`ov-id:${uuid}`, () =>
-      fetchJson(`${API}/${uuid}`) as Promise<OvImage>,
-    );
+    const img = await cached(`ov-id:${uuid}`, () => fetchJson(`${API}${uuid}`) as Promise<OvImage>);
     return normalize(img, "открытый контент") ?? undefined;
   } catch {
     return undefined;
@@ -126,11 +143,15 @@ export async function getOpenverseRelated(
 ): Promise<Pin[]> {
   // Сначала официальный related-эндпоинт, при сбое — поиск по тегу/названию.
   try {
-    const data = await cached(`ov-rel:${uuid}`, () =>
-      fetchJson(`${API}/${uuid}/related?page_size=${limit}`) as Promise<{ results: OvImage[] }>,
+    const data = await cached(
+      `ov-rel:${uuid}`,
+      () =>
+        fetchJson(`${API}${uuid}/related?page_size=${limit}`) as Promise<{ results: OvImage[] }>,
     );
     if (data.results?.length) {
-      return data.results.map((img) => normalize(img, "похожее")).filter((p): p is Pin => p !== null);
+      return data.results
+        .map((img) => normalize(img, "похожее"))
+        .filter((p): p is Pin => p !== null);
     }
   } catch {
     // fallthrough

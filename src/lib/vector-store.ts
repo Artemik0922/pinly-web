@@ -8,8 +8,14 @@ import type { Pin } from "@/data/pins";
 
 const STORE_PATH = join(process.cwd(), ".cache", "vectors.json");
 
+// Векторы разных моделей (и размерностей) несовместимы для cosine:
+// хранилище с другой версией/размерностью считаем пустым и
+// переиндексируем (npm run index).
+const EXPECTED_VERSION = 2;
+const EXPECTED_DIM = Number(process.env.EMBED_DIMENSIONS ?? 768);
+
 type VectorItem = { pin: Pin; vector: number[] };
-type Store = { version: 1; dim: number; items: VectorItem[] };
+type Store = { version: number; dim: number; items: VectorItem[] };
 
 let memory: Store | null = null;
 
@@ -21,9 +27,15 @@ export async function loadStore(): Promise<Store> {
   if (memory) return memory;
   try {
     const raw = await readFile(STORE_PATH, "utf8");
-    memory = JSON.parse(raw) as Store;
+    const parsed = JSON.parse(raw) as Store;
+    if (parsed.version !== EXPECTED_VERSION || parsed.dim !== EXPECTED_DIM) {
+      // несовместимое хранилище (другая модель/размерность)
+      memory = { version: EXPECTED_VERSION, dim: EXPECTED_DIM, items: [] };
+    } else {
+      memory = parsed;
+    }
   } catch {
-    memory = { version: 1, dim: 512, items: [] };
+    memory = { version: EXPECTED_VERSION, dim: EXPECTED_DIM, items: [] };
   }
   return memory;
 }
