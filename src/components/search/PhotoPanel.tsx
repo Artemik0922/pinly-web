@@ -44,22 +44,22 @@ export function PhotoDropZone({ state }: { state: PhotoSearchState }) {
           const file = e.dataTransfer.files?.[0];
           if (file) void run(file);
         }}
-        className={`mt-2 flex items-center gap-3 rounded-2xl border-2 border-dashed px-3 py-2 transition-colors ${
-          dragOver ? "border-accent bg-accent/5" : "border-border-soft"
+        className={`mt-1.5 flex h-7 w-full items-center gap-2 rounded-lg border border-dashed px-2 text-xs transition-colors ${
+          dragOver ? "border-accent bg-accent/5 text-foreground" : "border-border-soft text-muted"
         }`}
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element -- локальный blob-превью запроса
-          <img src={preview} alt="Картинка запроса" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+          <img src={preview} alt="Картинка запроса" className="h-5 w-5 shrink-0 rounded object-cover" />
         ) : (
-          <IconCamera size={16} className="shrink-0 text-muted" />
+          <IconCamera size={13} className="shrink-0" />
         )}
-        <p className="min-w-0 flex-1 truncate text-sm text-muted">
+        <p className="min-w-0 flex-1 truncate">
           {fileName
             ? `Ищем похожее на «${fileName}»`
             : "Перетащите картинку сюда или вставьте через Ctrl+V"}
         </p>
-        {busy && <span className="shrink-0 text-sm text-muted">ищем…</span>}
+        {busy && <span className="shrink-0">ищем…</span>}
       </div>
 
       {error && (
