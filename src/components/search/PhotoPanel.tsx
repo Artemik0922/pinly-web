@@ -32,34 +32,51 @@ export function PhotoDropZone({ state }: { state: PhotoSearchState }) {
 
   return (
     <>
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) void run(file);
-        }}
-        className={`mt-1.5 flex h-7 w-full items-center gap-2 rounded-lg border border-dashed px-2 text-xs transition-colors ${
-          dragOver ? "border-accent bg-accent/5 text-foreground" : "border-border-soft text-muted"
-        }`}
-      >
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element -- локальный blob-превью запроса
-          <img src={preview} alt="Картинка запроса" className="h-5 w-5 shrink-0 rounded object-cover" />
-        ) : (
-          <IconCamera size={13} className="shrink-0" />
-        )}
-        <p className="min-w-0 flex-1 truncate">
-          {fileName
-            ? `Ищем похожее на «${fileName}»`
-            : "Перетащите картинку сюда или вставьте через Ctrl+V"}
-        </p>
-        {busy && <span className="shrink-0">ищем…</span>}
+      {/* Квадратная зона приёма: зона загрузки читается как плитка-пин, а не
+          как полоса на весь экран. Подпись — справа, чтобы квадрат не резал
+          текст. */}
+      <div className="mt-2 flex items-center gap-3">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) void run(file);
+          }}
+          className={`grid aspect-square w-[120px] shrink-0 place-items-center overflow-hidden rounded-2xl border-2 border-dashed text-center transition-colors sm:w-[152px] ${
+            dragOver ? "border-accent bg-accent/5" : "border-border-soft"
+          }`}
+        >
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element -- локальный blob-превью запроса
+            <img src={preview} alt="Картинка запроса" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex flex-col items-center gap-1 px-2 text-muted">
+              <IconCamera size={20} />
+              <span className="text-xs leading-tight">
+                Перетащите
+                <br />
+                или Ctrl+V
+              </span>
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">
+            {fileName ? `Ищем похожее на «${fileName}»` : "Покажите картинку"}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Перетащите файл в квадрат, вставьте скриншот через Ctrl+V или выберите
+            его кнопкой выше.
+          </p>
+          {busy && <p className="mt-2 text-xs text-muted">Ищем похожее…</p>}
+        </div>
       </div>
 
       {error && (
