@@ -4,7 +4,7 @@
 
 import sqlite3
 
-from backend.accounts import DB_PATH
+from backend.db import DB_PATH
 
 def db(sql, params=()):
     with sqlite3.connect(DB_PATH) as conn:
@@ -72,9 +72,9 @@ def test_summary_requires_login(client):
 def test_summary_locks_non_owner_and_opens_for_owner(client, user, monkeypatch):
     """Владелец сводки задаётся адресом; проверка идёт по подписанной сессии,
     поэтому лишние регистрации не троим лимит /api/auth."""
-    from backend.accounts import SESSION_COOKIE, _jwt_decode
+    from backend.session import SESSION_COOKIE, jwt_decode
 
-    email = _jwt_decode(user["cookies"][SESSION_COOKIE])["email"]
+    email = jwt_decode(user["cookies"][SESSION_COOKIE])["email"]
     monkeypatch.setenv("PINLY_OWNER_EMAIL", "vladelets@example.test")
     assert client.get("/api/ev/summary", cookies=user["cookies"]).status_code == 403
 

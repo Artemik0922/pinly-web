@@ -1,6 +1,6 @@
 # Валидация ввода и раздача чужих байтов: то, что должно быть закрыто на замок.
 
-from backend import accounts
+from backend import ratelimit
 
 from conftest import FAKE_PNG, PNG, upload
 
@@ -103,7 +103,7 @@ def test_board_pin_payload_is_validated(client, user):
 
 def test_login_rate_limit(client, register):
     """Брутфорс пароля должен упираться в лимит, а не перебирать бесконечно."""
-    accounts._attempts.clear()  # счётчик в памяти: тесты не должны мешать друг другу
+    ratelimit._attempts.clear()  # счётчик в памяти: тесты не должны мешать друг другу
     email = register().json()["user"]["email"]
     codes = [
         client.post(
@@ -113,4 +113,4 @@ def test_login_rate_limit(client, register):
     ]
     assert 401 in codes
     assert 429 in codes, codes
-    accounts._attempts.clear()
+    ratelimit._attempts.clear()

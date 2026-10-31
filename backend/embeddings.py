@@ -3,16 +3,15 @@
 # Конфиг должен совпадать с Node-версией (src/lib/providers/embeddings.ts,
 # src/lib/vector-store.ts): векторы разных моделей несовместимы для
 # cosine, хранилище различает их по version/dim. Env читается лениво —
-# app.py подгружает .env.local уже после импортов.
+# server.load_dotenv подгружает .env.local уже после импортов.
 
 import json
 import math
 import os
-from pathlib import Path
 
 import httpx
 
-from backend.cache import CACHE_DIR, cached
+from .cache import CACHE_DIR, cached
 
 STORE_PATH = CACHE_DIR / "vectors.json"
 STORE_VERSION = 2

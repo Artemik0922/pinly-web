@@ -2,7 +2,7 @@
 
 import sqlite3
 
-from backend.accounts import DB_PATH
+from backend.db import DB_PATH
 
 from conftest import PNG, upload
 

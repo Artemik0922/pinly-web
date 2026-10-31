@@ -3,6 +3,10 @@
 # без проверки под видом .png можно сохранить HTML или SVG, который затем
 # отдаётся с нашего домена.
 
+# Описательный UA для чужих CDN (требование robot policy Wikimedia): маскировка
+# под браузер у них даёт 403, честный бот — 200.
+FETCHER_USER_AGENT = "Pinly demo image fetcher / contact: pinly@test.local"
+
 JPEG = b"\xff\xd8\xff"
 PNG = b"\x89PNG\r\n\x1a\n"
 WEBP = b"RIFF"

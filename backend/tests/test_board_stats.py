@@ -2,7 +2,6 @@
 # допущение рекламной модели — «расшаренная доска приводит чужих людей», —
 # поэтому проверяем разделение своих и чужих показов и доступ.
 
-from backend.accounts import SESSION_COOKIE
 
 
 def board(client, user, title="Работы", **fields):

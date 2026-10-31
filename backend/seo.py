@@ -10,12 +10,9 @@
 
 from datetime import date
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 
-try:
-    from backend.accounts import _db, rate_limit
-except ImportError:  # запуск из каталога backend/
-    from accounts import _db, rate_limit
+from .db import connection
 
 # Google принимает до 50 000 адресов в карте; столько здесь нет и не будет
 # долго, но потолок нужен, чтобы один запрос не вытаскивал всю базу.
@@ -38,29 +35,29 @@ QUERIES = {
 KINDS = tuple(QUERIES)
 
 
-def _day(ts: float) -> str:
+def check_kind(kind: str) -> None:
+    if kind != "all" and kind not in QUERIES:
+        raise HTTPException(400, "unknown kind")
+
+
+def cap_limit(limit: int) -> int:
+    """Завышенный лимит режется на стороне сервера, а не клиента."""
+    return max(1, min(int(limit or MAX_URLS), MAX_URLS))
+
+
+def day(ts: float) -> str:
     try:
         return date.fromtimestamp(ts).isoformat()
     except (OverflowError, OSError, ValueError):
         return date.today().isoformat()
 
 
-def _urls(kind: str, limit: int) -> list[dict]:
+def urls(kind: str, limit: int) -> list[dict]:
     names = KINDS if kind == "all" else (kind,)
-    urls: list[dict] = []
-    with _db() as conn:
+    result: list[dict] = []
+    with connection() as conn:
         for name in names:
             sql, prefix = QUERIES[name]
             for row in conn.execute(sql + " limit ?", (limit,)).fetchall():
-                urls.append({"path": f"{prefix}{row['id']}", "lastmod": _day(row["created_at"])})
-    return urls
-
-
-def register_seo(app) -> None:
-    @app.get("/api/seo/urls")
-    def seo_urls(request: Request, kind: str = "all", limit: int = MAX_URLS):
-        """Адреса для sitemap: `/pin/up-…`, `/board/<uuid>`, `/profile/<uuid>`."""
-        if kind != "all" and kind not in QUERIES:
-            raise HTTPException(400, "unknown kind")
-        rate_limit(request, "seo", limit=RATE_LIMIT, window_s=RATE_WINDOW_S)
-        return {"urls": _urls(kind, max(1, min(int(limit or MAX_URLS), MAX_URLS)))}
+                result.append({"path": f"{prefix}{row['id']}", "lastmod": day(row["created_at"])})
+    return result

@@ -91,11 +91,11 @@ def _clear_rate_limits():
     без сброса тесты, создающие по несколько аккаунтов, ловят 429 от
     регистраций предыдущих тестов. Тест, проверяющий лимит сам, чистит
     счётчик явно до и после."""
-    from backend import accounts
+    from backend import ratelimit
 
-    accounts._attempts.clear()
+    ratelimit._attempts.clear()
     yield
-    accounts._attempts.clear()
+    ratelimit._attempts.clear()
 
 
 @pytest.fixture
