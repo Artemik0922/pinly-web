@@ -18,7 +18,7 @@ import { UserMenu } from "@/components/layout/UserMenu";
 export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border-soft bg-background/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[1800px] items-center gap-3 px-4 py-3">
+      <div className="mx-auto flex w-full max-w-[1800px] items-center gap-3 px-4 py-2">
         <Link href="/" aria-label="Pinly — на главную" className="flex shrink-0 items-center gap-2">
           <LogoMark className="h-9 w-9 text-foreground" />
           <span className="hidden text-lg font-extrabold tracking-tight text-foreground sm:block">
@@ -29,7 +29,7 @@ export function Header() {
           fallback={
             <div
               aria-hidden
-              className="h-11 w-11 shrink-0 rounded-full bg-surface sm:h-9 sm:min-w-0 sm:flex-1"
+              className="h-11 w-11 shrink-0 rounded-full bg-surface sm:h-9 sm:max-w-xl sm:flex-1"
             />
           }
         >

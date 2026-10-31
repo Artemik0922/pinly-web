@@ -15,6 +15,22 @@ import { SearchModeTabs } from "@/components/search/SearchModeTabs";
 
 type Result = { q: string; pins: Pin[] };
 
+// Заголовок и переключатель режима — в одну строку: две строки подряд ради
+// пары кнопок съедали место, где могла быть первая карточка.
+function SearchHeading({ title, count }: { title: string; count?: number }) {
+  return (
+    <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-x-3 px-4">
+      <h1 className="min-w-0 truncate py-1 text-base font-bold sm:text-lg">
+        {title}
+        {count !== undefined && count > 0 && (
+          <span className="ml-2 font-normal text-muted">{count}</span>
+        )}
+      </h1>
+      <SearchModeTabs />
+    </div>
+  );
+}
+
 function SearchResults() {
   const params = useSearchParams();
   const q = params.get("q") ?? "";
@@ -50,10 +66,7 @@ function SearchResults() {
     return (
       <>
         <CategoryChips />
-        <div className="mx-auto w-full max-w-[1800px] px-4">
-          <h1 className="py-2 text-lg font-bold">Поиск по фото</h1>
-          <SearchModeTabs />
-        </div>
+        <SearchHeading title="Поиск по фото" />
         <PhotoSearch />
       </>
     );
@@ -62,15 +75,9 @@ function SearchResults() {
   return (
     <>
       <CategoryChips />
+      <SearchHeading title={q ? `Поиск: «${q}»` : "Что ищем?"} count={pins.length} />
       <div className="mx-auto w-full max-w-[1800px] px-4">
-        <h1 className="py-2 text-lg font-bold">
-          {q ? `Поиск: «${q}»` : "Что ищем?"}
-          {pins.length > 0 && <span className="ml-2 font-normal text-muted">{pins.length}</span>}
-        </h1>
-
-        <SearchModeTabs />
-
-        {loading && <p className="py-10 text-center text-sm text-muted">Ищем…</p>}
+        {loading && <p className="py-6 text-center text-sm text-muted">Ищем…</p>}
 
         {error && (
           <div className="py-10 text-center text-sm">
@@ -90,22 +97,22 @@ function SearchResults() {
         )}
 
         {!loading && !error && pins.length > 0 && (
-          <div className="mt-4">
+          <div className="mt-2">
             <MasonryGrid pins={pins} />
           </div>
         )}
 
         {!loading && !error && q && pins.length === 0 && (
-          <div className="py-16 text-center">
+          <div className="py-10 text-center">
             <p className="grid place-items-center text-muted">
-              <IconQuestion size={40} />
+              <IconQuestion size={32} />
             </p>
-            <p className="mt-3 text-muted">
+            <p className="mt-2 text-muted">
               По запросу «{q}» ничего не нашлось. Попробуйте категорию или тег.
             </p>
             <Link
               href="/"
-              className="mt-5 inline-block rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background hover:opacity-90"
+              className="mt-4 inline-block rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
             >
               Вернуться в ленту
             </Link>

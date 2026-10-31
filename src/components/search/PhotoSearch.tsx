@@ -86,6 +86,8 @@ export function PhotoSearch() {
 
   return (
     <div className="mx-auto w-full max-w-[1800px] px-4">
+      {/* Одна строка вместо карточки с квадратом 96×96: зона поиска не должна
+          съедать экран — под ней результаты. */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -98,7 +100,7 @@ export function PhotoSearch() {
           const file = e.dataTransfer.files?.[0];
           if (file) void run(file);
         }}
-        className={`mt-4 flex flex-wrap items-center gap-4 rounded-3xl border-2 border-dashed p-4 transition-colors ${
+        className={`mt-2 flex items-center gap-3 rounded-2xl border-2 border-dashed p-2 transition-colors ${
           dragOver ? "border-accent bg-accent/5" : "border-border-soft"
         }`}
       >
@@ -107,30 +109,33 @@ export function PhotoSearch() {
           <img
             src={preview}
             alt="Картинка запроса"
-            className="h-24 w-24 shrink-0 rounded-2xl object-cover"
+            className="h-10 w-10 shrink-0 rounded-xl object-cover"
           />
         ) : (
-          <span className="grid h-24 w-24 shrink-0 place-items-center rounded-2xl bg-surface text-muted">
-            <IconCamera size={30} />
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface text-muted">
+            <IconCamera size={18} />
           </span>
         )}
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">
+          <p className="truncate text-sm font-semibold">
             {fileName ? `Ищем похожее на «${fileName}»` : "Покажите картинку"}
           </p>
-          <p className="mt-1 text-sm text-muted">
-            Перетащите файл, вставьте скриншот (Ctrl+V) или выберите его в памяти — пины
+          {/* на мобильном подсказка важнее, чем экономия строки: без неё Ctrl+V
+              не найдётся. На sm+ — одна строка. */}
+          <p className="line-clamp-2 text-xs text-muted sm:line-clamp-1 sm:truncate">
+            Перетащите файл, вставьте скриншот (Ctrl+V) или выберите его — пины
             сравниваются по смыслу картинки, а не по названию.
           </p>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="mt-3 rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
-          >
-            Выбрать файл
-          </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="min-h-11 shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 sm:min-h-0"
+        >
+          Выбрать файл
+        </button>
 
         <input
           ref={inputRef}
@@ -146,7 +151,7 @@ export function PhotoSearch() {
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 flex flex-wrap items-center gap-3 text-sm text-danger">
+        <p role="alert" className="mt-2 flex flex-wrap items-center gap-3 text-sm text-danger">
           <span>{error.text}</span>
           {error.retryable && lastFile && (
             <button
@@ -159,17 +164,17 @@ export function PhotoSearch() {
           )}
         </p>
       )}
-      {busy && <p className="mt-6 py-6 text-center text-sm text-muted">Ищем похожее…</p>}
+      {busy && <p className="mt-2 py-3 text-center text-sm text-muted">Ищем похожее…</p>}
 
       {!busy && pins && pins.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-4 text-lg font-bold">Похожие пины · {pins.length}</h2>
+        <section className="mt-4">
+          <h2 className="mb-2 text-base font-bold">Похожие пины · {pins.length}</h2>
           <MasonryGrid pins={pins} />
         </section>
       )}
 
       {!busy && pins && pins.length === 0 && (
-        <p className="mt-8 py-10 text-center text-sm text-muted">
+        <p className="mt-2 py-8 text-center text-sm text-muted">
           Похожего не нашлось — в индексе пока нет близких по картинке пинов.
         </p>
       )}

@@ -45,14 +45,16 @@ export function SearchBar() {
         </Link>
       </div>
       <form
-        className="hidden min-w-0 flex-1 sm:block"
+        className="hidden min-w-0 flex-1 justify-center sm:flex"
         onSubmit={(e) => {
           e.preventDefault();
           go();
         }}
       >
-        <label className="flex items-center gap-2 rounded-full bg-surface px-4 py-2.5 focus-within:ring-2 focus-within:ring-accent/40">
-          <IconSearch size={16} className="shrink-0 text-muted" />
+        {/* h-9 и max-w-xl: на широком экране поле растянулось бы на 700+ px —
+            половина шапки пустая, а курсор летит через весь экран. */}
+        <label className="flex h-9 w-full max-w-xl items-center gap-2 rounded-full bg-surface px-3 focus-within:ring-2 focus-within:ring-accent/40">
+          <IconSearch size={15} className="shrink-0 text-muted" />
           <input
             value={value}
             onChange={(e) => setTyped(e.target.value)}
@@ -70,9 +72,9 @@ export function SearchBar() {
             href="/search?by=image"
             aria-label="Поиск по фото"
             title="Поиск по фото"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
           >
-            <IconCamera size={17} />
+            <IconCamera size={16} />
           </Link>
         </label>
       </form>
