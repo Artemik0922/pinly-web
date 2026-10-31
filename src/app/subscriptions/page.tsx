@@ -3,8 +3,8 @@
 // Вкладка «Подписки»: пины и открытые доски авторов, на которых подписан.
 
 import Link from "next/link";
-import { SubscriptionsFeed } from "@/components/SubscriptionsFeed";
-import { useUser } from "@/lib/user";
+import { SubscriptionsFeed } from "@/components/feed/SubscriptionsFeed";
+import { useUser } from "@/lib/state/session";
 
 export default function SubscriptionsPage() {
   const { user, ready, enabled } = useUser();

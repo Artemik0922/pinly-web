@@ -1,19 +1,23 @@
 "use client";
 
-// Создание своего пина: картинка с устройства + описание.
-// Размеры изображения читает браузер и присылает на бэкенд,
-// поэтому на сервере не нужны библиотеки вроде Pillow.
+// Создание своего пина: картинка с устройства или из медиатеки + описание.
+// Жизнью картинки (превью, blob-URL, размеры, проверка файла) ведёт хук
+// usePinImage и его зона Dropzone; здесь — форма, публикация и доступ.
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { CATEGORIES } from "@/data/pins";
-import { apiCreatePin, apiCreatePinFromUrl, apiMediaList } from "@/lib/account";
-import { useBoards } from "@/lib/store";
-import { useUser } from "@/lib/user";
-import { IconImage } from "@/components/Icons";
+import { CATEGORIES } from "@/data/mock-pins";
+import { apiMediaList } from "@/lib/api/media";
+import { apiCreatePin, apiCreatePinFromUrl } from "@/lib/api/pins";
+import { isStatus } from "@/lib/api/http";
+import { useBoards } from "@/lib/state/boards";
+import { useUser } from "@/lib/state/session";
+import { PinDropzone } from "@/components/pin/PinDropzone";
+import { usePinImage } from "@/components/pin/usePinImage";
+import { MAX_UPLOAD_MB } from "@/lib/upload-limits";
 
-const MAX_FILE_MB = 10;
+const MAX_FILE_MB = MAX_UPLOAD_MB;
 
 export default function NewPinPage() {
   return (
@@ -29,18 +33,6 @@ function NewPinInner() {
   const { boards, togglePin } = useBoards();
   const searchParams = useSearchParams();
 
-  // Картинка и её размеры живут одной состоянием: превью, проверка
-  // и загрузка всегда относятся к одному источнику. Размеры читает браузер —
-  // на сервере не нужен Pillow. Источник два: файл с устройства
-  // (file) или картинка на внешнем хостинге (sourceUrl).
-  const [image, setImage] = useState<{
-    file?: File;
-    sourceUrl?: string;
-    url: string;
-    width: number;
-    height: number;
-  } | null>(null);
-  const urlRef = useRef<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIES[0] ?? "");
@@ -48,75 +40,45 @@ function NewPinInner() {
   const [boardId, setBoardId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Blob-URL отдаём загрузчику: при уходе со страницы освобождаем память
-  useEffect(
-    () => () => {
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    },
-    [],
-  );
+  const { image, pickFile, attachMedia, reset } = usePinImage(MAX_FILE_MB, setError);
 
   // Возврат назад после публикации: браузер восстанавливает страницу из
   // bfcache вместе с залипшим «Публикуем…» — сбрасываем состояние формы
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
-      if (e.persisted) {
-        setBusy(false);
-        setImage(null);
-      }
+      if (!e.persisted) return;
+      setBusy(false);
+      reset();
     };
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
-  }, []);
+  }, [reset]);
 
-  // Предзаполнение из медиатеки: /pin/new?media=<id>
+  // Предзаполнение из медиатеки: /pin/new?media=<id>. Один раз на id: иначе
+  // каждое обновление страницы перезаписывало бы уже отредактированный черновик.
   const mediaId = searchParams.get("media");
   const mediaTaken = useRef<string | null>(null);
   useEffect(() => {
     if (!mediaId || !user || mediaTaken.current === mediaId) return;
     mediaTaken.current = mediaId;
     let cancelled = false;
-    (async () => {
-      try {
-        const items = await apiMediaList();
+    apiMediaList()
+      .then((items) => {
         const item = items.find((m) => m.id === mediaId);
         if (!item || cancelled) return;
-        if (item.external) {
-          // картинка на внешнем хостинге: файл не пересылаем, пин
-          // публикуется со ссылкой (показ идёт через наш прокси)
-          setImage({
-            sourceUrl: item.url,
-            url: item.url,
-            width: item.width || 800,
-            height: item.height || 1000,
-          });
-        } else {
-          const blob = await fetch(item.url).then((r) => r.blob());
-          if (cancelled) return;
-          const ext = item.url.split(".").pop() ?? "png";
-          const f = new File([blob], `media.${ext}`, { type: blob.type || "image/png" });
-          if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-          const url = URL.createObjectURL(f);
-          urlRef.current = url;
-          setImage({
-            file: f,
-            url,
-            width: item.width || 800,
-            height: item.height || 1000,
-          });
-        }
+        void attachMedia(item).catch(() =>
+          setError("Не удалось взять картинку из медиатеки."),
+        );
         setTitle((t) => t || item.title);
-      } catch {
-        setError("Не удалось взять картинку из медиатеки.");
-      }
-    })();
+      })
+      .catch(() => {
+        if (!cancelled) setError("Не удалось взять картинку из медиатеки.");
+      });
     return () => {
       cancelled = true;
     };
-  }, [mediaId, user]);
+  }, [mediaId, user, attachMedia]);
 
   if (!ready) {
     return <p className="py-20 text-center text-sm text-muted">Загрузка…</p>;
@@ -136,32 +98,6 @@ function NewPinInner() {
       </div>
     );
   }
-
-  const pickFile = (f: File | undefined | null) => {
-    if (!f) return;
-    if (f.size > MAX_FILE_MB * 1024 * 1024) {
-      setError(`Файл больше ${MAX_FILE_MB} МБ`);
-      return;
-    }
-    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
-      setError("Поддерживаются JPG, PNG и WebP");
-      return;
-    }
-    setError(null);
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    const url = URL.createObjectURL(f);
-    urlRef.current = url;
-    const img = new Image();
-    img.onload = () =>
-      setImage({ file: f, url, width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      urlRef.current = null;
-      setImage(null);
-      setError("Файл не читается как картинка.");
-    };
-    img.src = url;
-  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,21 +119,18 @@ function NewPinInner() {
         width: image.width,
         height: image.height,
       };
-      // источник два: файл (локальное хранилище) или ссылка на внешний
-      // хостинг (ImgBB и т.п.) — для внешнего файл не пересылаем
-      const pin = image.file
+      const published = image.file
         ? await apiCreatePin({ file: image.file, ...common })
         : await apiCreatePinFromUrl({ sourceUrl: image.sourceUrl ?? "", ...common });
-      if (boardId) togglePin(boardId, pin);
-      router.push(`/pin/${pin.id}`);
+      if (boardId) togglePin(boardId, published);
+      router.push(`/pin/${published.id}`);
       router.refresh();
     } catch (err) {
       setBusy(false);
-      const status = (err as { status?: number }).status;
       setError(
-        status === 401
+        isStatus(err, 401)
           ? "Сессия истекла — войдите заново."
-          : status === 413
+          : isStatus(err, 413)
             ? `Файл больше ${MAX_FILE_MB} МБ.`
             : "Не удалось загрузить пин. Проверьте, что бэкенд запущен.",
       );
@@ -212,53 +145,8 @@ function NewPinInner() {
         onSubmit={submit}
         className="mt-8 grid gap-6 rounded-[32px] bg-surface-card p-4 sm:p-6 md:grid-cols-2"
       >
-        {/* Картинка */}
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            pickFile(e.dataTransfer.files?.[0]);
-          }}
-          className={`grid min-h-[280px] place-items-center rounded-3xl border-2 border-dashed p-4 transition-colors ${
-            dragOver ? "border-accent bg-accent/5" : "border-border-soft"
-          }`}
-        >
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- локальный blob-превью
-            <img
-              src={image.url}
-              alt="Превью"
-              className="max-h-[420px] rounded-2xl object-contain"
-            />
-          ) : (
-            <div className="text-center text-muted">
-              <IconImage size={40} className="mx-auto" />
-              <p className="mt-3 text-sm font-semibold">Перетащите картинку сюда</p>
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="mt-3 rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
-              >
-                Выбрать файл
-              </button>
-              <p className="mt-2 text-xs text-muted">JPG, PNG или WebP, до {MAX_FILE_MB} МБ</p>
-            </div>
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => pickFile(e.target.files?.[0])}
-          />
-        </div>
+        <PinDropzone maxFileMb={MAX_FILE_MB} image={image} onPick={pickFile} />
 
-        {/* Поля */}
         <div className="flex flex-col gap-3">
           <input
             value={title}

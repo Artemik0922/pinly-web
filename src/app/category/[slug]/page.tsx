@@ -14,12 +14,12 @@ import { Suspense, cache } from "react";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { HomeFeed } from "@/components/HomeFeed";
-import { SkeletonGrid } from "@/components/SkeletonGrid";
-import { pinImageUrl } from "@/data/pins";
+import { HomeFeed } from "@/components/feed/HomeFeed";
+import { SkeletonGrid } from "@/components/ui/SkeletonGrid";
+import { pinImageUrl } from "@/lib/pin";
 import { slugToCategory } from "@/lib/categories";
-import { getFeedPage } from "@/lib/feed";
-import { SITE_URL, absoluteUrl } from "@/lib/site";
+import { getFeedPage } from "@/lib/server/feed";
+import { pageMetadata } from "@/lib/server/seo";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -60,17 +60,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Превью для ссылок в чатах: без og:image доска и категория — серая
   // полоска текста, и в мессенджере на неё не кликают.
   const image = (await categoryFeed(page.name)).pins[0];
-  return {
+  return pageMetadata({
     title: page.title,
     description: page.description,
-    alternates: { canonical: path },
-    openGraph: {
-      title: page.title,
-      description: page.description,
-      url: `${SITE_URL}${path}`,
-      images: image ? [{ url: absoluteUrl(pinImageUrl(image)), alt: page.title }] : undefined,
-    },
-  };
+    path,
+    imageUrl: image ? pinImageUrl(image) : undefined,
+  });
 }
 
 export default async function CategoryPage({ params }: Props) {

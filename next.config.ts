@@ -1,36 +1,55 @@
 import type { NextConfig } from "next";
 
+// Same-origin прокси в Python-бэкенд: cookie-сессия ставится для домена сайта,
+// поэтому CORS не нужен ни в браузере, ни в тестах.
+//
+// Список — то, чем владеет бэкенд. source и destination здесь всегда
+// совпадают, поэтому один перечень префиксов вместо 25 рукописных пар:
+// забытый подпуть — это не 404, а тихо вернувшийся Next-роут.
+//
+// Особые случаи отдельно: /api/feed и /api/img — роуты самого Next (у ленты
+// оттуда только /api/feed/subscriptions), /api/pin/:pid/comments живёт внутри
+// чужого префикса.
+const BACKEND_PREFIXES = [
+  "/api/auth",
+  "/api/boards",
+  "/api/likes",
+  "/api/pins",
+  "/api/uploads",
+  "/api/users",
+  "/api/notifications",
+  "/api/media",
+  "/api/comments",
+  "/api/chats",
+  "/api/messages",
+];
+
+const BACKEND_EXACT = [
+  // События продукта: POST принимает бэкенд (пишет в свою SQLite).
+  "/api/ev",
+  "/api/ev/summary",
+  "/api/ev/board",
+  "/api/img/download",
+  "/api/feed/subscriptions",
+];
+
+function toBackend(backend: string, path: string) {
+  return { source: path, destination: `${backend}${path}` };
+}
+
 const nextConfig: NextConfig = {
-  /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
   async rewrites() {
-    // Аккаунты живут в Python-бэкенде (backend/app.py). Same-origin прокси,
-    // поэтому cookie-сессия ставится для домена сайта без CORS.
     const backend = process.env.ACCOUNTS_BACKEND_URL ?? "http://127.0.0.1:8000";
     return {
       afterFiles: [
-        { source: "/api/auth/:path*", destination: `${backend}/api/auth/:path*` },
-        { source: "/api/boards", destination: `${backend}/api/boards` },
-        { source: "/api/boards/:path*", destination: `${backend}/api/boards/:path*` },
-        { source: "/api/likes", destination: `${backend}/api/likes` },
-        { source: "/api/likes/:path*", destination: `${backend}/api/likes/:path*` },
-        { source: "/api/pins", destination: `${backend}/api/pins` },
-        { source: "/api/pins/:path*", destination: `${backend}/api/pins/:path*` },
-        { source: "/api/uploads/:path*", destination: `${backend}/api/uploads/:path*` },
-        { source: "/api/img/download", destination: `${backend}/api/img/download` },
-        { source: "/api/users/:path*", destination: `${backend}/api/users/:path*` },
-        { source: "/api/notifications", destination: `${backend}/api/notifications` },
-        { source: "/api/notifications/:path*", destination: `${backend}/api/notifications/:path*` },
-        { source: "/api/media", destination: `${backend}/api/media` },
-        // События продукта: POST принимает бэкенд (пишет в свою SQLite).
-        { source: "/api/ev", destination: `${backend}/api/ev` },
-        { source: "/api/ev/summary", destination: `${backend}/api/ev/summary` },
-        { source: "/api/ev/board", destination: `${backend}/api/ev/board` },
-        { source: "/api/media/:path*", destination: `${backend}/api/media/:path*` },
-        { source: "/api/comments/:path*", destination: `${backend}/api/comments/:path*` },
-        { source: "/api/pin/:pid/comments", destination: `${backend}/api/pin/:pid/comments` },
-        { source: "/api/feed/subscriptions", destination: `${backend}/api/feed/subscriptions` },
+        ...BACKEND_PREFIXES.flatMap((prefix) => [
+          toBackend(backend, prefix),
+          toBackend(backend, `${prefix}/:path*`),
+        ]),
+        ...BACKEND_EXACT.map((path) => toBackend(backend, path)),
+        toBackend(backend, "/api/pin/:pid/comments"),
       ],
     };
   },

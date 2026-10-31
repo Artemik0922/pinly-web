@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
-import { BoardsProvider } from "@/lib/store";
-import { LikesProvider } from "@/lib/likes";
-import { UserProvider } from "@/lib/user";
-import { ToastProvider } from "@/components/Toast";
-import { Header } from "@/components/Header";
-import { Splash } from "@/components/Splash";
+import { BoardsProvider } from "@/lib/state/boards";
+import { LikesProvider } from "@/lib/state/likes";
+import { UserProvider } from "@/lib/state/session";
+import { ToastProvider } from "@/components/ui/Toast";
+import { Header } from "@/components/layout/Header";
+import { Splash } from "@/components/layout/Splash";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 

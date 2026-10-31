@@ -7,16 +7,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  apiNotifications,
-  apiNotificationsReadAll,
-  type NotificationItem,
-  type NotificationType,
-} from "@/lib/account";
-import { useUser } from "@/lib/user";
+import { apiNotifications, apiNotificationsReadAll, type NotificationItem, type NotificationType } from "@/lib/api/notifications";
+import { useUser } from "@/lib/state/session";
 import { timeAgo } from "@/lib/time";
-import { Avatar } from "@/components/Avatar";
-import { IconBell, IconComment, IconFolder, IconHeart, IconUserPlus } from "@/components/Icons";
+import { Avatar } from "@/components/ui/Avatar";
+import { SignInGate } from "@/components/ui/SignInGate";
+import { IconBell, IconComment, IconFolder, IconHeart, IconUserPlus } from "@/components/ui/Icons";
 
 // Текст действия — согласуется с мужским именем автора события по умолчанию,
 // как в RU-интерфейсах Pinterest/VK; пол автора серверу неизвестен.
@@ -125,22 +121,7 @@ export default function NotificationsPage() {
 
   if (!ready || !enabled) return null;
 
-  if (!user) {
-    return (
-      <main className="mx-auto w-full max-w-2xl px-4 py-10 text-center">
-        <h1 className="text-xl font-bold">Уведомления</h1>
-        <p className="mt-2 text-sm text-muted">
-          Войдите в аккаунт, чтобы видеть оценки, сохранения и подписки.
-        </p>
-        <Link
-          href="/login"
-          className="mt-4 inline-block rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
-        >
-          Войти
-        </Link>
-      </main>
-    );
-  }
+  if (!user) return <SignInGate title="Уведомления" hint="Войдите в аккаунт, чтобы видеть оценки, сохранения и подписки." />;
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-6">

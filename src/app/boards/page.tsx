@@ -4,14 +4,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { type Pin } from "@/data/pins";
-import { PinImage } from "@/components/PinCard";
-import { ConfirmDialog } from "@/components/Confirm";
-import { useBoards } from "@/lib/store";
-import { useUser } from "@/lib/user";
+import { type Pin } from "@/lib/pin";
+import { PinImage } from "@/components/feed/PinCard";
+import { ConfirmDialog } from "@/components/ui/Confirm";
+import { useBoards } from "@/lib/state/boards";
+import { useUser } from "@/lib/state/session";
 import { track } from "@/lib/track";
 import { pinCountLabel, boardPinCount } from "@/lib/plural";
-import { IconFolder, IconLock, IconPin } from "@/components/Icons";
+import { IconFolder, IconLock, IconPin } from "@/components/ui/Icons";
 
 function BoardThumb({ pin }: { pin: Pin }) {
   return (

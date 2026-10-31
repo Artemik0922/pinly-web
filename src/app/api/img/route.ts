@@ -10,7 +10,7 @@
 import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { MAX_IMG_BYTES, imageHash, isAllowedImgHost, sniffImageType } from "@/lib/providers/proxy";
+import { MAX_IMG_BYTES, imageHash, isAllowedImgHost, sniffImageType } from "@/lib/server/img-proxy";
 
 const CACHE_DIR = join(process.cwd(), ".cache", "img");
 const TIMEOUT_MS = 20000;
@@ -109,7 +109,9 @@ export async function GET(req: NextRequest) {
     image = await cachedImage(url);
   } catch (err) {
     if (err instanceof UpstreamError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      // детали апстрима пишет access_log, наружу — только класс отказа:
+      // по сообщению нельзя перебирать allowlist хостов
+      return NextResponse.json({ error: "upstream refused" }, { status: err.status });
     }
     return NextResponse.json({ error: "fetch failed" }, { status: 504 });
   }

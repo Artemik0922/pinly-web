@@ -8,7 +8,7 @@
 
 import { connection } from "next/server";
 import type { MetadataRoute } from "next";
-import { PINS } from "@/data/pins";
+import { PINS } from "@/data/mock-pins";
 import { CATEGORY_PAGES } from "@/lib/categories";
 import { SITE_URL } from "@/lib/site";
 

@@ -5,11 +5,11 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import type { Pin } from "@/data/pins";
-import { searchPins } from "@/lib/api";
-import { MasonryGrid } from "@/components/MasonryGrid";
-import { CategoryChips } from "@/components/CategoryChips";
-import { IconQuestion } from "@/components/Icons";
+import type { Pin } from "@/lib/pin";
+import { searchPins } from "@/lib/api/feed";
+import { MasonryGrid } from "@/components/ui/MasonryGrid";
+import { CategoryChips } from "@/components/ui/CategoryChips";
+import { IconQuestion } from "@/components/ui/Icons";
 
 type Result = { q: string; pins: Pin[] };
 

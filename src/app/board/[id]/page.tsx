@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { BoardView } from "@/components/BoardView";
-import { boardMeta } from "@/lib/meta";
-import { SITE_URL } from "@/lib/site";
+import { BoardView } from "@/components/board/BoardView";
+import { boardMeta } from "@/lib/server/meta";
+import { pageMetadata } from "@/lib/server/seo";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -17,17 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const meta = await boardMeta(id);
   if (!meta) return { title: "Доска" };
-  return {
-    title: meta.title,
-    description: meta.description,
-    alternates: { canonical: meta.path },
-    openGraph: {
-      title: meta.title,
-      description: meta.description,
-      url: `${SITE_URL}${meta.path}`,
-      images: meta.imageUrl ? [{ url: meta.imageUrl, alt: meta.title }] : undefined,
-    },
-  };
+  return pageMetadata(meta);
 }
 
 export default function BoardPage({ params }: Props) {

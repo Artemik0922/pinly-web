@@ -4,7 +4,7 @@
 // показывала бы пустой белый экран.
 
 import Link from "next/link";
-import { IconCompass } from "@/components/Icons";
+import { IconCompass } from "@/components/ui/Icons";
 
 export default function AppError({ reset }: { error: Error; reset: () => void }) {
   return (

@@ -2,10 +2,11 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getPinById, getRelated } from "@/lib/feed";
-import { pinImageSize, pinImageUrl } from "@/data/pins";
+import { getPinById, getRelated } from "@/lib/server/feed";
+import { pinImageSize, pinImageUrl } from "@/lib/pin";
 import { SITE_URL, absoluteUrl } from "@/lib/site";
-import { PinDetail } from "@/components/PinDetail";
+import { jsonLdText, pageMetadata } from "@/lib/server/seo";
+import { PinDetail } from "@/components/pin/PinDetail";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -40,7 +41,7 @@ async function PinContent({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdText(jsonLd) }}
       />
       <PinDetail pin={pin} related={related} />
     </>
@@ -54,18 +55,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const pin = await getPinById(id);
   if (!pin) return { title: "Пин не найден" };
-  return {
+  // og подписывает автора, когда описания нет — короткая строка вместо пустой
+  return pageMetadata({
     title: pin.title,
     description: pin.description || `Пин от ${pin.author} · ${pin.category}`,
-    alternates: { canonical: `/pin/${pin.id}` },
-    openGraph: {
-      type: "article",
-      title: pin.title,
-      description: pin.description || `Пин от ${pin.author}`,
-      url: `${SITE_URL}/pin/${pin.id}`,
-      images: [{ url: absoluteUrl(pinImageUrl(pin)), alt: pin.title }],
-    },
-  };
+    path: `/pin/${pin.id}`,
+    imageUrl: pinImageUrl(pin),
+    type: "article",
+  });
 }
 
 export default function PinPage({ params }: Props) {

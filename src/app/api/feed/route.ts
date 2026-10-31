@@ -3,7 +3,7 @@
 // персональная подборка по вектору вкуса.
 
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, getFeedPage } from "@/lib/feed";
+import { SESSION_COOKIE, getFeedPage } from "@/lib/server/feed";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

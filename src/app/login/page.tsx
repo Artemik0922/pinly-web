@@ -2,36 +2,27 @@
 
 // Вход по email+паролю: сессию ставит Python-бэкенд (httpOnly-cookie).
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { apiLogin } from "@/lib/account";
-import { useUser } from "@/lib/user";
-import { Field } from "@/components/Field";
+import { apiLogin } from "@/lib/api/auth";
+import { isStatus } from "@/lib/api/http";
+import { AuthError, AuthShell, AuthSubmit } from "@/components/auth/AuthShell";
+import { useAuthFlow } from "@/components/auth/useAuthFlow";
+import { Field } from "@/components/ui/Field";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { refreshUser } = useUser();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, start, finish, fail } = useAuthFlow();
 
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setBusy(true);
+    start();
     try {
       await apiLogin(email, password);
-      // шапка и провайдеры узнают о сессии без перезагрузки
-      await refreshUser();
-      router.push("/");
-      router.refresh();
-      return;
+      await finish();
     } catch (err) {
-      setBusy(false);
-      setError(
-        (err as { status?: number }).status === 401
+      fail(
+        isStatus(err, 401)
           ? "Неверный email или пароль."
           : "Сервер авторизации недоступен. Проверьте, что запущен Python-бэкенд.",
       );
@@ -39,9 +30,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-4 py-14">
-      <h1 className="text-center text-2xl font-extrabold">Вход в Pinly</h1>
-
+    <AuthShell
+      title="Вход в Pinly"
+      question="Нет аккаунта?"
+      href="/signup"
+      linkLabel="Зарегистрируйтесь"
+    >
       <form onSubmit={signIn} className="mt-8 space-y-4">
         <Field
           label="Email"
@@ -59,22 +53,9 @@ export default function LoginPage() {
           value={password}
           onChange={setPassword}
         />
-        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-full bg-foreground py-3 text-sm font-semibold text-background transition-transform duration-150 ease-pop hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-        >
-          {busy ? "Входим…" : "Войти"}
-        </button>
+        <AuthError message={error} />
+        <AuthSubmit busy={busy} label="Войти" busyLabel="Входим…" />
       </form>
-
-      <p className="mt-8 text-center text-sm text-muted">
-        Нет аккаунта?{" "}
-        <Link href="/signup" className="font-semibold text-accent-strong hover:underline">
-          Зарегистрируйтесь
-        </Link>
-      </p>
-    </div>
+    </AuthShell>
   );
 }

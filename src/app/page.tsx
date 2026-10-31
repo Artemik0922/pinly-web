@@ -6,10 +6,11 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
-import { SESSION_COOKIE, getFeedPage } from "@/lib/feed";
-import { HomeFeed } from "@/components/HomeFeed";
-import { SkeletonGrid } from "@/components/SkeletonGrid";
+import { SESSION_COOKIE, getFeedPage } from "@/lib/server/feed";
+import { HomeFeed } from "@/components/feed/HomeFeed";
+import { SkeletonGrid } from "@/components/ui/SkeletonGrid";
 import { CATEGORY_BY_NAME, categoryHref } from "@/lib/categories";
+import { pageMetadata } from "@/lib/server/seo";
 
 type Props = { searchParams: Promise<{ category?: string; feed?: string }> };
 
@@ -21,14 +22,14 @@ type Props = { searchParams: Promise<{ category?: string; feed?: string }> };
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const { category, feed } = await searchParams;
   if (feed === "subscriptions") {
-    return { title: "Лента подписок", robots: { index: false, follow: true } };
+    return pageMetadata({ title: "Лента подписок", path: "/", noIndex: true });
   }
   if (!category) return { alternates: { canonical: "/" } };
   const page = CATEGORY_BY_NAME[category];
-  return {
-    ...(page ? { title: page.title, description: page.description } : null),
-    alternates: { canonical: categoryHref(category) },
-  };
+  // Неизвестная категория — без своего заголовка: страница отдаёт ленту, но
+  // в индекс под таким названием идти нельзя.
+  if (!page) return { alternates: { canonical: categoryHref(category) } };
+  return pageMetadata({ title: page.title, description: page.description, path: categoryHref(category) });
 }
 
 async function HomeContent({ searchParams }: Props) {
