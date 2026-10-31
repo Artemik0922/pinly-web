@@ -1,0 +1,31 @@
+name: Warm cache
+
+# Прогрев дискового кэша Прод-сервера: первый посетитель не должен платить
+# ~8 секунд за ответы Openverse и Wikimedia (замер 2026-10-31: холодный поиск
+# 8,66 с, тёплый 0,02 с). Запросы идут ЧЕРЕЗ сайт, то есть греют кэш того
+# сервера, на который указывают, — поэтому адрес задаётся секретом, а не
+# хардкодом. Без секрета задача завершается успешно и ничего не делает.
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Прогрев ленты и картинок
+        env:
+          WARM_BASE_URL: ${{ secrets.WARM_URL }}
+        run: |
+          if [ -z "$WARM_BASE_URL" ]; then
+            echo "секрет WARM_URL не задан — пропускаю"
+            exit 0
+          fi
+          npm ci --omit=dev || true
+          node scripts/warm.mjs

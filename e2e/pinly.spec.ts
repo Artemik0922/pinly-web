@@ -45,7 +45,9 @@ test("регистрация, секретная доска и коммента�
   await page.goto("/pin/pin-1", { waitUntil: "domcontentloaded" });
   const box = page.getByPlaceholder("Добавьте комментарий…");
   await box.fill(`Смоук-комментарий ${stamp}`);
-  await page.getByRole("button", { name: "Отправить" }).click();
+  // exact: на странице пина есть и кнопка «Отправить в сообщении» (чат),
+    // без exact строгий локатор находит оба
+    await page.getByRole("button", { name: "Отправить", exact: true }).click();
   await expect(page.getByText(`Смоук-комментарий ${stamp}`)).toBeVisible();
   // и его можно удалить со страницы
   await page.getByRole("button", { name: "Удалить комментарий" }).first().click();
@@ -224,4 +226,42 @@ test("мастер видит цифры своей доски", async ({ page, 
   await anon.goto(boardUrl, { waitUntil: "domcontentloaded" });
   await expect(anon.getByText("Цифры доски")).toHaveCount(0);
   await anon.close();
+});
+
+test("заголовок пина не разрывает блок структурированных данных", async ({ page }) => {
+  // Payload в названии: страница пина отдаётся без авторизации, а JSON-LD
+  // вставляется как текст <script>. Если его не экранировать, закрывающий тег
+  // из названия обрывает блок, и дальше браузер исполняет уже разметку
+  // (stored XSS). Проверено живым запросом 2026-10-31 — тест нужен, чтобы это
+  // не вернулось под видом «мелкой правки метаданных».
+  const payload = `XSS ${Date.now()}</script><b class="xss">BB</b>`;
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  await page.goto("/signup");
+  await page.getByLabel("Имя", { exact: true }).fill("Тихон Эксплоит");
+  await page.getByLabel("Email", { exact: true }).fill(`xss${Date.now()}@example.test`);
+  await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await expect(page).toHaveURL("/");
+
+  await page.goto("/pin/new");
+  await page.setInputFiles('input[type="file"]', { name: "x.png", mimeType: "image/png", buffer: png });
+  await page.getByPlaceholder("Название").fill(payload);
+  await page.getByRole("button", { name: "Опубликовать" }).click();
+  await expect(page).toHaveURL(/\/pin\/up-[0-9a-f]{32}$/);
+
+  // ни одного «лишнего» узла из payload: экранирование обязано остаться в тексте
+  await expect(page.locator("b.xss")).toHaveCount(0);
+  const ld = page.locator('script[type="application/ld+json"]');
+  await expect(ld).toHaveCount(1);
+  // toContainText читает innerText, а у <script> он пустой: смотрим textContent
+  const ldText = (await ld.textContent()) ?? "";
+  expect(ldText).toContain("\\u003c/script\\u003e");
+  expect(ldText).not.toContain("</script>");
+  // и при этом заголовок виден читателю целиком — escape не портит содержимое
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("XSS");
 });

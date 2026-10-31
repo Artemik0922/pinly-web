@@ -56,12 +56,12 @@ Python-бэкенде на SQLite, оптимизацией картинок з�
 
 | | Что там | Где смотреть |
 | --- | --- | --- |
-| **Лента** | масонри-сетка, инфинити-скролл, ротация категорий, вкладка «Подписки» | [`src/components/MasonryGrid.tsx`](src/components/MasonryGrid.tsx), [`src/lib/feed.ts`](src/lib/feed.ts) |
-| **Пины** | страница с похожими, лайк, скачивание, «поделиться», комментарии, теги и автор | [`src/components/PinDetail.tsx`](src/components/PinDetail.tsx) |
-| **Свои загрузки** | drag&drop, тип файла по сигнатуре, имя файла генерирует сервер; опционально внешний хостинг | [`backend/pins.py`](backend/pins.py) |
-| **Доски** | создание, переименование, удаление, коллажи-превью, секретные доски, публичная ссылка, по которой доску видят чужие | [`src/components/BoardView.tsx`](src/components/BoardView.tsx) |
+| **Лента** | масонри-сетка, инфинити-скролл, ротация категорий, вкладка «Подписки» | [`src/components/ui/MasonryGrid.tsx`](src/components/ui/MasonryGrid.tsx), [`src/lib/server/feed.ts`](src/lib/server/feed.ts) |
+| **Пины** | страница с похожими, лайк, скачивание, «поделиться», комментарии, теги и автор | [`src/components/pin/PinDetail.tsx`](src/components/pin/PinDetail.tsx) |
+| **Свои загрузки** | drag&drop, тип файла по сигнатуре, имя файла генерирует сервер; опционально внешний хостинг | [`backend/routers/pins.py`](backend/routers/pins.py), [`backend/pins.py`](backend/pins.py) |
+| **Доски** | создание, переименование, удаление, коллажи-превью, секретные доски, публичная ссылка, по которой доску видят чужие | [`src/components/board/BoardView.tsx`](src/components/board/BoardView.tsx) |
 | **Аккаунты** | регистрация, сессия httpOnly-cookie, аватар, удаление аккаунта с каскадом по всем данным | [`backend/accounts.py`](backend/accounts.py) |
-| **Соцблок** | подписки, публичные профили и доски, комментарии, уведомления о лайке, комментарии и подписке | [`backend/social.py`](backend/social.py), [`backend/notifications.py`](backend/notifications.py) |
+| **Соцблок** | подписки, публичные профили и доски, комментарии, уведомления о лайке, комментарии и подписке | [`backend/routers/social.py`](backend/routers/social.py), [`backend/notifications.py`](backend/notifications.py) |
 | **Поиск** | по названию, описанию, тегам и категории; с ключом — ещё и смысловой, по векторам | [`src/app/search/page.tsx`](src/app/search/page.tsx) |
 | **Мелочи** | светлая и тёмная тема до первой отрисовки, тосты, подтверждение удаления, стартовый экран с роем мышей | [`src/app/layout.tsx`](src/app/layout.tsx) |
 
@@ -89,7 +89,7 @@ Next.js 16 (App Router, RSC, cacheComponents)
    │                          + дисковый кэш .cache/
    └── rewrites /api/auth|boards|pins|uploads|users|comments|ev|notifications
         ▼
-      FastAPI (backend/app.py) ── SQLite (.data/accounts.db, WAL)
+      FastAPI (backend/server.py) ── SQLite (.data/accounts.db, WAL)
                               └── файлы пользователей (.data/uploads)
 ```
 
@@ -100,10 +100,12 @@ cookie-сессия ставится для сайта и CORS не нужен �
 | Слой | Файлы |
 | --- | --- |
 | Страницы (App Router) | [`src/app/`](src/app) |
-| Компоненты | [`src/components/`](src/components) |
-| Серверный слой ленты и провайдеры | [`src/lib/feed.ts`](src/lib/feed.ts), [`src/lib/providers/`](src/lib/providers) |
-| Клиентские состояния: доски, лайки, сессия | [`src/lib/store.tsx`](src/lib/store.tsx), [`src/lib/likes.tsx`](src/lib/likes.tsx), [`src/lib/user.tsx`](src/lib/user.tsx) |
-| Бэкенд | [`backend/`](backend) |
+| Компоненты — по доменам | [`ui/`](src/components/ui), [`layout/`](src/components/layout), [`feed/`](src/components/feed), [`pin/`](src/components/pin), [`board/`](src/components/board), [`chat/`](src/components/chat), [`profile/`](src/components/profile) |
+| REST-клиент: по одному модулю на домен бэкенда | [`src/lib/api/`](src/lib/api) |
+| Серверный слой ленты и провайдеры (node-only) | [`src/lib/server/`](src/lib/server) |
+| Клиентские состояния: сессия, доски, лайки | [`src/lib/state/`](src/lib/state) |
+| Модель пина (общий контракт для моков, источников и загрузок) | [`src/lib/pin.ts`](src/lib/pin.ts) |
+| Бэкенд: сервисы доменов + HTTP-роутеры | [`backend/`](backend), [`backend/routers/`](backend/routers) |
 | Тесты | [`backend/tests/`](backend/tests), [`e2e/pinly.spec.ts`](e2e/pinly.spec.ts) |
 
 <details>
@@ -111,33 +113,54 @@ cookie-сессия ставится для сайта и CORS не нужен �
 
 ```
 src/
-  data/pins.ts         — моки (fallback) + контракт типов Pin
-  lib/feed.ts          — серверный слой ленты: Openverse → моки, векторный
-                         поиск, персональная подборка
-  lib/categories.ts    — slug'и и тексты посадочных страниц категорий
-  lib/track.ts         — счётчик событий (sendBeacon + fetch keepalive)
-  lib/meta.ts, site.ts — заголовки/OG для серверных страниц
-  lib/providers/       — openverse.ts (API), cache.ts (кэш + backoff),
-                         proxy.ts (/api/img), embeddings.ts (ROUTERAI)
-  lib/queries.ts       — поисковые запросы категорий
-  lib/store.tsx        — доски и сохранения: аноним — localStorage,
-                         вошедший — БД бэкенда
-  lib/account.ts       — REST-клиент аккаунтов, пинов и соцблока
-  lib/vector-store.ts  — .cache/vectors.json: косинусный поиск по эмбеддингам
-  components/          — Header, CategoryChips, MasonryGrid, PinCard,
-                         SaveControls, InfiniteFeed, PinDetail, Comments,
-                         ProfileView, BoardView, BoardStats, SubscriptionsFeed,
-                         Avatar, Splash, Toast, Confirm, Icons
   app/                 — страницы, sitemap.ts, robots.ts
+  data/mock-pins.ts    — моки (fallback) для ленты без внешнего API
+  lib/
+    pin.ts             — тип Pin и размеры/URL картинки; клиент-безопасный
+    api/               — REST-клиент: http.ts (транспорт) + auth, boards,
+                         likes, pins, social, media, notifications, chats, feed
+    state/             — клиентские провайдеры: session.tsx (useUser),
+                         boards.tsx (useBoards), likes.tsx (useLikes),
+                         board-storage.ts (локальный режим и миграция в БД)
+    server/            — только Node: feed.ts (лента, векторный вкус, похожие),
+                         backend.ts (запросы к Python-бэкенду), meta.ts, seo.ts,
+                         img-proxy.ts (правила /api/img), vector-store.ts,
+                         queries.ts, providers/ (openverse, extras, cache,
+                         embeddings)
+    storage.ts         — localStorage без исключений в приватном режиме
+    share.ts           — нативный sheet и копирование ссылки с запасным путём
+    image-dims.ts      — размеры картинки до загрузки
+    categories.ts      — slug'и и тексты посадочных страниц категорий
+    plural.ts, time.ts — русские счётчики и «5 минут назад»
+    site.ts, track.ts  — базовый адрес сайта; счётчик событий
+  components/
+    ui/                — Avatar, MasonryGrid, Toast, Confirm, Field, Icons,
+                         SkeletonGrid, ThemeToggle, LogoMark, CategoryChips
+    layout/            — Header, Splash
+    feed/              — HomeFeed, InfiniteFeed, PinCard, SubscriptionsFeed
+    pin/               — PinDetail, PinActions, OwnerControls, Comments,
+                         SaveControls
+    board/             — BoardView, BoardStats, PublicBoardCard
+    chat/              — ChatView, useChatThread, MessageList, MessageRow,
+                         ChatHeader, Composer, PinAttachment, SendPinDialog,
+                         PinPickerDialog
+    profile/           — ProfileView, PublicProfile, ProfileEditor
 backend/
-  app.py               — лента/поиск/картинки + сборка приложения, /healthz
-  accounts.py          — регистрация, сессии, доски, лайки, taste (SQLite)
-  pins.py              — свои пины: загрузка, раздача файлов, правка
-  social.py            — подписки, комментарии, публичные профили и доски
-  notifications.py     — уведомления автору пина/комментария
-  events.py            — приём событий и сводки (глобальная и по доске)
-  seo.py               — GET /api/seo/urls: адреса для sitemap.xml
-  images.py            — определение типа по сигнатуре
+  app.py               — точка входа ASGI: `uvicorn backend.app:app` и `app:app`
+  server.py            — сборка приложения: логи, CORS, request-id, порядок маршрутов
+  db.py                — одна схема SQLite, упорядоченные миграции, соединение на запрос
+  deps.py              — Depends: current_user (401), optional_user, session_payload
+  schemas.py           — pydantic-модели всех принимаемых тел (падеж клиента — контракт)
+  erasure.py           — единственное место, где каскад стирает строки всех доменов
+  session.py            — секрет подписи, JWT HS256 и httpOnly-кука сессии
+  ratelimit.py          — счётчик «action:ip» для входа, записи и событий
+  accounts.py           — пароли (PBKDF2), таблица users, журнал согласий
+  boards.py likes.py pins.py media.py uploads.py chats.py social.py
+  notifications.py events.py seo.py mealdb.py feed.py imgproxy.py
+                       — сервисы доменов: запросы к БД и правила, без HTTP
+  routers/             — HTTP-слой: auth, boards, likes, pins, media, social,
+                         chats, notifications, events, seo, mealdb, feed, img
+  images.py cache.py embeddings.py mock-pins.json
   tests/               — pytest-контур (изолированная .data)
 e2e/                   — Playwright-смоук
 scripts/               — warm (прогрев кэша), index (эмбеддинги), make-logo, make-hero
@@ -163,7 +186,7 @@ Dockerfile             — образ «Next + FastAPI» (порт 3000, том 
 сутки, и лимиты Openverse (анонимно 20 запросов в минуту и 200 в день)
 перестают быть лимитами сайта. Если источник недоступен, включается
 экспоненциальная пауза, его вклад пустеет, а лента падает на локальные моки
-([`src/data/pins.ts`](src/data/pins.ts)) — пустых экранов не бывает. Автора
+([`src/data/mock-pins.ts`](src/data/mock-pins.ts)) — пустых экранов не бывает. Автора
 картинки и лицензию видно прямо на странице пина.
 
 `npm run warm` прогревает кэш заранее. Без него первый посетитель платит
@@ -182,7 +205,9 @@ PBKDF2-HMAC-SHA256.
 > события — `sha256(секрет + IP + дата)`: суточный счётчик уникальных, который
 > нельзя склеить в историю одного человека. Из реферера остаётся только хост.
 > Email наружу не отдаётся никогда: в публичных ответах есть только имя, которое
-> человек ввёл сам.
+> человек ввёл сам. При удалении аккаунта он исчезает и из журнала согласий:
+> строка остаётся (версия документа, UA, дата — это доказательство), но вместо
+> адреса в ней HMAC-метка, которую без секрета сервера не сопоставить с почтой.
 
 - Удаление аккаунта стирает доски, пины, файлы, лайки, подписки и комментарии.
   Мягких копий не остаётся ни в одной таблице.
@@ -279,6 +304,8 @@ npm run build              # продакшн-сборка
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) гоняет это тремя
 работами: `frontend` (типы, линт, сборка на Node 22), `backend` (pytest на
 Python 3.13) и `e2e`, которая стартует только после двух зелёных.
+
+Второй рабочий файл — [`warm.yml`](.github/workflows/warm.yml): каждый час в :17 он запускает `node scripts/warm.mjs` по адресу из секрета `WARM_URL` и тем самым греет кэш прода. Без секретов задача проходит пусто, так что форкать репозиторий безопасно.
 
 Два момента, на которых тесты врут, если о них не знать:
 
