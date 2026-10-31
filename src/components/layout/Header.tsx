@@ -6,6 +6,7 @@
 // регион читает динамический хук, поэтому без пререндера не обходится.
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -14,6 +15,17 @@ import { NavLinks } from "@/components/layout/NavLinks";
 import { SearchBar } from "@/components/layout/SearchBar";
 import { MessagesLink, NotificationBell } from "@/components/layout/UnreadBadges";
 import { UserMenu } from "@/components/layout/UserMenu";
+
+// Поле поиска вместе решением «показывать ли его»: usePathname внутри
+// Suspense-дыры, а не в шапке — статический шелл PPR-страниц не должен читать
+// адрес, иначе билд падает с CLIENT_HOOK_DYNAMIC.
+function SearchSlot() {
+  const pathname = usePathname();
+  // На странице поиска поле своё, в строке с результатами: два одинаковых
+  // ввода на одном экране — это два места, где искать, а не одно.
+  if (pathname === "/search") return <div aria-hidden className="min-w-0 flex-1" />;
+  return <SearchBar />;
+}
 
 export function Header() {
   return (
@@ -33,7 +45,7 @@ export function Header() {
             />
           }
         >
-          <SearchBar />
+          <SearchSlot />
         </Suspense>
         <nav className="flex shrink-0 items-center gap-2 sm:gap-3">
           {/* На мобильном текстовой навигации нет: строка не вмещает

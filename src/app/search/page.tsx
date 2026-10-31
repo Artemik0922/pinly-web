@@ -1,33 +1,68 @@
 "use client";
 
-// Результаты поиска по названию, описанию, тегам и категории.
+// Страница поиска: поле, переключатель режима, источник фото и результаты —
+// в одной колонке по центру. Раньше заголовок жался слева, вкладки улетали к
+// правому краю контейнера на 1800 px, а между ними висела пустота.
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import type { Pin } from "@/lib/pin";
 import { searchPins } from "@/lib/api/feed";
 import { MasonryGrid } from "@/components/ui/MasonryGrid";
 import { CategoryChips } from "@/components/ui/CategoryChips";
-import { IconQuestion } from "@/components/ui/Icons";
-import { PhotoSearch } from "@/components/search/PhotoSearch";
+import { IconQuestion, IconSearch } from "@/components/ui/Icons";
+import { PhotoDropZone, PhotoResults } from "@/components/search/PhotoPanel";
+import { PhotoSourceMenu } from "@/components/search/PhotoSourceMenu";
 import { SearchModeTabs } from "@/components/search/SearchModeTabs";
+import { usePhotoSearch } from "@/components/search/usePhotoSearch";
 
 type Result = { q: string; pins: Pin[] };
 
-// Заголовок и переключатель режима — в одну строку: две строки подряд ради
-// пары кнопок съедали место, где могла быть первая карточка.
-function SearchHeading({ title, count }: { title: string; count?: number }) {
+// Ширина панели: на 1920 px строка поиска во всю ширину превращается в бегущую
+// полосу, где поле и кнопка не видны одновременно.
+const PANEL = "mx-auto w-full max-w-[1120px] px-4";
+
+function SearchField({ q }: { q: string }) {
+  const router = useRouter();
+  // Пока пользователь не печатал, поле живёт по URL (переходы по тегам и чипам
+  // подставляют запрос). Состояние из эффекта здесь только плодит рассинхрон.
+  const [typed, setTyped] = useState<string | null>(null);
+  const value = typed ?? q;
+
+  const submit = () => {
+    const query = value.trim();
+    setTyped(null);
+    router.push(query ? `/search?q=${encodeURIComponent(query)}` : "/");
+  };
+
   return (
-    <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-x-3 px-4">
-      <h1 className="min-w-0 truncate py-1 text-base font-bold sm:text-lg">
-        {title}
-        {count !== undefined && count > 0 && (
-          <span className="ml-2 font-normal text-muted">{count}</span>
-        )}
-      </h1>
-      <SearchModeTabs />
-    </div>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="flex h-11 w-full min-w-[200px] items-center gap-2 rounded-full bg-surface px-4 focus-within:ring-2 focus-within:ring-accent/40 sm:h-10 sm:w-auto sm:max-w-[560px] sm:flex-1"
+    >
+      <IconSearch size={16} className="shrink-0 text-muted" />
+      <input
+        value={value}
+        onChange={(e) => setTyped(e.target.value)}
+        placeholder="Найти идеи…"
+        aria-label="Поиск пинов"
+        className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => setTyped("")}
+          aria-label="Очистить запрос"
+          className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
+        >
+          ×
+        </button>
+      )}
+    </form>
   );
 }
 
@@ -36,12 +71,14 @@ function SearchResults() {
   const router = useRouter();
   const q = params.get("q") ?? "";
   const byPhoto = params.get("by") === "image";
-  // pick=1 — режим открыли по ссылке из шапки или по вкладке «По фото»:
-  // меню источников разворачивают сразу, лишний тап не нужен.
+  // pick=1 — в режим вошли по ссылке из шапки или по вкладке «По фото»: меню
+  // источников разворачивают сразу, лишний тап не нужен.
   const pick = params.get("pick") === "1";
+
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const photo = usePhotoSearch(byPhoto);
 
   useEffect(() => {
     if (!q.trim()) return;
@@ -62,68 +99,88 @@ function SearchResults() {
     };
   }, [q, attempt]);
 
-  // Ответ ещё не по текущему запросу — значит ищем.
-  const loading = !error && result?.q !== q;
+  // Ответ ещё не по текущему запросу — значит ищем. Пустой запрос не ищем
+  // никогда: «Ищем…» без запроса выглядит как зависший сайт.
+  const loading = q.trim() !== "" && !error && result?.q !== q;
   const pins = result?.q === q ? result.pins : [];
-
-  if (byPhoto) {
-    return (
-      <>
-        <CategoryChips />
-        <SearchHeading title="Поиск по фото" />
-        <PhotoSearch
-          autoOpen={pick}
-          onAutoOpenHandled={() => router.replace("/search?by=image")}
-        />
-      </>
-    );
-  }
 
   return (
     <>
       <CategoryChips />
-      <SearchHeading title={q ? `Поиск: «${q}»` : "Что ищем?"} count={pins.length} />
-      <div className="mx-auto w-full max-w-[1800px] px-4">
-        {loading && <p className="py-6 text-center text-sm text-muted">Ищем…</p>}
+      <div className={PANEL}>
+        <h1 className="pt-4 text-sm font-semibold text-muted">
+          {byPhoto ? "Поиск по фото" : q ? `Поиск: «${q}»` : "Что ищем?"}
+          {!byPhoto && pins.length > 0 && <span className="ml-2">{pins.length}</span>}
+        </h1>
 
-        {error && (
-          <div className="py-10 text-center text-sm">
-            <p className="text-danger" role="alert">{error}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                setResult(null);
-                setAttempt((n) => n + 1);
-              }}
-              className="mt-3 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
-            >
-              Повторить
-            </button>
-          </div>
-        )}
+        {/* Всё управление в одну строку: поле, режим, источник фото. */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <SearchField q={q} />
+          <SearchModeTabs />
+          {byPhoto && (
+            <PhotoSourceMenu
+              onFile={photo.run}
+              onError={photo.setError}
+              autoOpen={pick}
+              onCloseAutoOpen={() => router.replace("/search?by=image")}
+            />
+          )}
+        </div>
 
-        {!loading && !error && pins.length > 0 && (
-          <div className="mt-2">
-            <MasonryGrid pins={pins} />
-          </div>
-        )}
+        {byPhoto ? (
+          <>
+            <PhotoDropZone state={photo} />
+            {!photo.busy && <PhotoResults pins={photo.pins} />}
+          </>
+        ) : (
+          <>
+            {!q && (
+              <p className="mt-3 text-sm text-muted">
+                Печатайте запрос — ищем по названию, описанию, тегам и категории.
+              </p>
+            )}
+            {loading && <p className="mt-3 text-sm text-muted">Ищем…</p>}
 
-        {!loading && !error && q && pins.length === 0 && (
-          <div className="py-10 text-center">
-            <p className="grid place-items-center text-muted">
-              <IconQuestion size={32} />
-            </p>
-            <p className="mt-2 text-muted">
-              По запросу «{q}» ничего не нашлось. Попробуйте категорию или тег.
-            </p>
-            <Link
-              href="/"
-              className="mt-4 inline-block rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
-            >
-              Вернуться в ленту
-            </Link>
-          </div>
+            {error && (
+              <div className="mt-3 text-sm">
+                <p className="text-danger" role="alert">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setResult(null);
+                    setAttempt((n) => n + 1);
+                  }}
+                  className="mt-2 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
+                >
+                  Повторить
+                </button>
+              </div>
+            )}
+
+            {!loading && !error && pins.length > 0 && (
+              <div className="mt-4">
+                <MasonryGrid pins={pins} />
+              </div>
+            )}
+
+            {!loading && !error && q && pins.length === 0 && (
+              <div className="py-10 text-center">
+                <p className="grid place-items-center text-muted">
+                  <IconQuestion size={32} />
+                </p>
+                <p className="mt-2 text-muted">
+                  По запросу «{q}» ничего не нашлось. Попробуйте категорию или тег.
+                </p>
+                <Link
+                  href="/"
+                  className="mt-4 inline-block rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
+                >
+                  Вернуться в ленту
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </div>
     </>

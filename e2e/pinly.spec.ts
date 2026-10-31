@@ -293,6 +293,20 @@ test("режим «по фото» открывается из поиска и �
   await expect(page.getByRole("link", { name: "По тексту" })).toHaveAttribute("href", /q=sofa/);
 });
 
+test("поле, режим и источник фото — в одной строке, а не на разных концах экрана", async ({ page }) => {
+  await page.goto("/search?q=sofa");
+  const field = page.getByLabel("Поиск пинов");
+  await expect(field).toBeVisible();
+  // в шапке поля больше нет: два одинаковых ввода на одной странице — это два
+  // места, где искать
+  await expect(field).toHaveCount(1);
+  const box = await field.boundingBox();
+  const tabs = await page.getByRole("navigation", { name: "Режим поиска" }).boundingBox();
+  expect(box && tabs && Math.abs(box.y - tabs.y) < 40).toBeTruthy();
+  // и поле не растянуто на весь экран
+  expect(box?.width).toBeLessThan(700);
+});
+
 test("меню источников фото: камера, файл, буфер — открывается сразу по pick=1", async ({ page }) => {
   const menu = page.getByRole("menu");
   // вход в режим по ссылке из шапки разворачивает меню без лишнего тапа
