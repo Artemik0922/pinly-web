@@ -10,6 +10,7 @@ import { ApiError } from "@/lib/api/http";
 import { PhotoSearchUnavailable, searchPinsByPhoto } from "@/lib/api/search";
 import { MasonryGrid } from "@/components/ui/MasonryGrid";
 import { IconCamera } from "@/components/ui/Icons";
+import { PhotoSourceMenu } from "@/components/search/PhotoSourceMenu";
 
 const MAX_PHOTO_MB = 5;
 const ACCEPTED = /^image\/(jpeg|png|webp)$/;
@@ -26,14 +27,19 @@ function messageOf(err: unknown): { text: string; retryable: boolean } {
   return { text: GENERIC, retryable: false };
 }
 
-export function PhotoSearch() {
+export function PhotoSearch({
+  autoOpen,
+  onAutoOpenHandled,
+}: {
+  autoOpen?: boolean;
+  onAutoOpenHandled?: () => void;
+} = {}) {
   const [preview, setPreview] = useState<string | null>(null);
   const [pins, setPins] = useState<Pin[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ text: string; retryable: boolean } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   // последний файл — в состоянии: кнопка «попробовать ещё» появляется в разметке
   const [lastFile, setLastFile] = useState<File | null>(null);
@@ -129,25 +135,7 @@ export function PhotoSearch() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="min-h-11 shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 sm:min-h-0"
-        >
-          Выбрать файл
-        </button>
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void run(file);
-            e.target.value = "";
-          }}
-        />
+        <PhotoSourceMenu onFile={run} onError={setError} autoOpen={autoOpen} onCloseAutoOpen={onAutoOpenHandled} />
       </div>
 
       {error && (

@@ -37,7 +37,7 @@ export function SearchBar() {
           <IconSearch size={18} className="text-muted" />
         </Link>
         <Link
-          href="/search?by=image"
+          href="/search?by=image&pick=1"
           aria-label="Поиск по фото"
           className="grid h-11 w-11 place-items-center rounded-full bg-surface"
         >
@@ -69,7 +69,7 @@ export function SearchBar() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
           <Link
-            href="/search?by=image"
+            href="/search?by=image&pick=1"
             aria-label="Поиск по фото"
             title="Поиск по фото"
             className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"

@@ -287,10 +287,24 @@ const sendPhoto = (
 test("режим «по фото» открывается из поиска и держит форму", async ({ page }) => {
   await page.goto("/search?by=image");
   await expect(page.getByRole("heading", { level: 1, name: "Поиск по фото" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Выбрать файл" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Добавить фото/ })).toBeVisible();
   // переключение режима не теряет набранный запрос
   await page.goto("/search?q=sofa&by=image");
   await expect(page.getByRole("link", { name: "По тексту" })).toHaveAttribute("href", /q=sofa/);
+});
+
+test("меню источников фото: камера, файл, буфер — открывается сразу по pick=1", async ({ page }) => {
+  const menu = page.getByRole("menu");
+  // вход в режим по ссылке из шапки разворачивает меню без лишнего тапа
+  await page.goto("/search?by=image&pick=1");
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: /Камера/ })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: /Файл с компьютера/ })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: /Из буфера обмена/ })).toBeVisible();
+  // закрыли — флаг сбрасывается, чтобы перезагрузка не открывала меню заново
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(page).toHaveURL("/search?by=image");
 });
 
 test("поиск по фото отвечает честным статусом и объясняет по-русски", async ({ request }) => {

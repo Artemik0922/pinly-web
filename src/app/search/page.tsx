@@ -2,7 +2,7 @@
 
 // Результаты поиска по названию, описанию, тегам и категории.
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Pin } from "@/lib/pin";
@@ -33,8 +33,12 @@ function SearchHeading({ title, count }: { title: string; count?: number }) {
 
 function SearchResults() {
   const params = useSearchParams();
+  const router = useRouter();
   const q = params.get("q") ?? "";
   const byPhoto = params.get("by") === "image";
+  // pick=1 — режим открыли по ссылке из шапки или по вкладке «По фото»:
+  // меню источников разворачивают сразу, лишний тап не нужен.
+  const pick = params.get("pick") === "1";
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -67,7 +71,10 @@ function SearchResults() {
       <>
         <CategoryChips />
         <SearchHeading title="Поиск по фото" />
-        <PhotoSearch />
+        <PhotoSearch
+          autoOpen={pick}
+          onAutoOpenHandled={() => router.replace("/search?by=image")}
+        />
       </>
     );
   }

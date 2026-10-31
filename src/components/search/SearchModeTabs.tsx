@@ -20,7 +20,7 @@ export function SearchModeTabs() {
       <Link href={q ? `/search?q=${encodeURIComponent(q)}` : "/search"} className={`${TAB} ${!params.get("by") ? ACTIVE : IDLE}`}>
         По тексту
       </Link>
-      <Link href="/search?by=image" className={`${TAB} ${params.get("by") === "image" ? ACTIVE : IDLE}`}>
+      <Link href="/search?by=image&pick=1" className={`${TAB} ${params.get("by") === "image" ? ACTIVE : IDLE}`}>
         По фото
       </Link>
     </nav>
