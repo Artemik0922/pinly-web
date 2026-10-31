@@ -1,37 +1,18 @@
 // Прогрев кэша: заполняет дисковый кэш ленты (Openverse) и картинок
-// (/api/img), обращаясь к запущенному серверу через обычные роуты —
-// ровно тот же кодpath, что и у реальных пользователей.
+// (/api/img), обращаясь к запущенному серверу через обычные роуты — ровно тот
+// же путь кода, что у реальных пользователей.
 //
 // Использование: запустите сервер (npm start), затем `npm run warm`.
 // Троттлинг 4с между запросами ленты — чтобы не выйти за анонимный
 // лимит Openverse 20 запросов/мин.
 
+import { feedJobs, fetchFeedPage, imageUrl } from "./pins-source.mjs";
+
 const BASE = process.env.WARM_BASE_URL ?? "http://localhost:3000";
-const CATEGORIES = [
-  "Интерьер",
-  "Рецепты",
-  "Путешествия",
-  "Мода",
-  "Искусство",
-  "Природа",
-  "Архитектура",
-  "Рукоделие",
-  "Фитнес",
-  "Книги и рабочее место",
-];
-const PAGES_PER_CATEGORY = 3; // cursors 0..2 = все 3 запроса категории
-const ALL_FEED_PAGES = 6;
 const IMAGE_CONCURRENCY = 5;
 const FEED_DELAY_MS = 4000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function warmFeed(params) {
-  const url = `${BASE}/api/feed?${new URLSearchParams(params)}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(45000) });
-  if (!res.ok) throw new Error(`${res.status} @ ${url}`);
-  return res.json();
-}
 
 async function main() {
   console.log(`Прогрев кэша через ${BASE}…`);
@@ -39,19 +20,13 @@ async function main() {
   let feeds = 0;
   let failures = 0;
 
-  const jobs = [];
-  for (const category of CATEGORIES) {
-    for (let cursor = 0; cursor < PAGES_PER_CATEGORY; cursor++) {
-      jobs.push({ category, cursor });
-    }
-  }
-  for (let cursor = 0; cursor < ALL_FEED_PAGES; cursor++) {
-    jobs.push({ cursor });
-  }
+  // План обхода общий с индексатором (pins-source): греется ровно то, что
+  // потом индексируется.
+  const jobs = feedJobs();
 
   for (const job of jobs) {
     try {
-      const page = await warmFeed(job);
+      const page = await fetchFeedPage(BASE, job);
       feeds++;
       for (const pin of page.pins) {
         if (pin.sourceUrl) imageUrls.add(pin.sourceUrl);
@@ -73,7 +48,7 @@ async function main() {
     while (queue.length) {
       const u = queue.shift();
       try {
-        const res = await fetch(`${BASE}/api/img?u=${encodeURIComponent(u)}`, {
+        const res = await fetch(imageUrl(BASE, u), {
           signal: AbortSignal.timeout(30000),
         });
         if (!res.ok) throw new Error(String(res.status));

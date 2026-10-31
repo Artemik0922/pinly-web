@@ -3,14 +3,22 @@
 // здесь только fetch. Всё, что повторялось в каждом эндпоинте (Content-Type,
 // разбор 204, ошибка со статусом, сигнал 401), собрано тут.
 
-/** Ошибка HTTP-ответа бэкенда. Статус нужен вызывающему: 404 = «нет», а не сбой. */
+/** Ошибка HTTP-ответа. Статус нужен вызывающему: 404 = «нет», а не сбой. */
 export class ApiError extends Error {
   readonly status: number;
+  /**
+   * Текст, который роут Next написал в поле `error` ответа: наши эндпоинты
+   * объясняют причину по-русски, и повторять эти строки на клиенте не нужно.
+   * У бэкенда поля `error` нет (там `detail`), поэтому для его ответов поле
+   * остаётся пустым и вызывающий судит только по статусу.
+   */
+  readonly serverMessage?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, serverMessage?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.serverMessage = serverMessage;
   }
 }
 
@@ -35,9 +43,21 @@ function reportUnauthorized(res: Response, endpoint: string): void {
   }
 }
 
+// Тело ответа ошибки читаем только ради короткого поля `error` наших же роутов:
+// длинный или чужой текст наружу не выпускаем — в него теоретически может
+// попасть кусок ответа провайдера.
+async function serverMessage(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    return typeof body.error === "string" && body.error.length <= 300 ? body.error : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function toApiError(res: Response, endpoint: string): Promise<never> {
   reportUnauthorized(res, endpoint);
-  throw new ApiError(`api ${res.status}`, res.status);
+  throw new ApiError(`api ${res.status}`, res.status, await serverMessage(res));
 }
 
 export async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
@@ -52,8 +72,12 @@ export async function requestJson<T>(input: string, init?: RequestInit): Promise
 
 // multipart: Content-Type не ставим — браузер сам добавляет boundary.
 // Тело ответа факультативно: загрузка аватара отвечает 204 без JSON.
-export async function requestMultipart<T>(input: string, body: FormData): Promise<T> {
-  const res = await fetch(input, { method: "POST", body });
+export async function requestMultipart<T>(
+  input: string,
+  body: FormData,
+  init?: { signal?: AbortSignal },
+): Promise<T> {
+  const res = await fetch(input, { method: "POST", body, signal: init?.signal });
   if (!res.ok) await toApiError(res, input);
   if (res.status === 204) return undefined as T;
   const text = await res.text();

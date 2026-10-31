@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 // Три сценария, которые дороже всего ломать: лента, новый аккаунт с
 // секретной доской и комментарий под пином. Всё — через интерфейс, как
@@ -264,4 +264,71 @@ test("заголовок пина не разрывает блок структ�
   expect(ldText).not.toContain("</script>");
   // и при этом заголовок виден читателю целиком — escape не портит содержимое
   await expect(page.getByRole("heading", { level: 1 })).toContainText("XSS");
+});
+
+// ── поиск по фото ────────────────────────────────────────────────────────
+
+// 1×1 PNG: настоящая сигнатура, которую проходит sniffImageType на сервере.
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+const sendPhoto = (
+  request: APIRequestContext,
+  buffer: Buffer,
+  headers?: Record<string, string>,
+) =>
+  request.post("/api/search/image", {
+    multipart: { file: { name: "photo.png", mimeType: "image/png", buffer } },
+    ...(headers ? { headers } : null),
+  });
+
+test("режим «по фото» открывается из поиска и держит форму", async ({ page }) => {
+  await page.goto("/search?by=image");
+  await expect(page.getByRole("heading", { level: 1, name: "Поиск по фото" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Выбрать файл" })).toBeVisible();
+  // переключение режима не теряет набранный запрос
+  await page.goto("/search?q=sofa&by=image");
+  await expect(page.getByRole("link", { name: "По тексту" })).toHaveAttribute("href", /q=sofa/);
+});
+
+test("поиск по фото отвечает честным статусом и объясняет по-русски", async ({ request }) => {
+  // Мусор с расширением .png — 400, и именно это проверка порядка: ошибка
+  // клиента важнее конфигурации сервера, иначе без ключа был бы всегда 503.
+  const garbage = await sendPhoto(request, Buffer.from("<html><script>alert(1)</script></html>"));
+  expect(garbage.status()).toBe(400);
+  expect((await garbage.json()).error).toContain("не читается");
+
+  const huge = await sendPhoto(request, Buffer.alloc(6 * 1024 * 1024, 1));
+  expect(huge.status()).toBe(413);
+  expect((await huge.json()).error).toContain("5 МБ");
+
+  // Настоящая картинка: настройка зависит от env сервера, поэтому проверяем
+  // контракт, а не конкретный статус — 500 тут быть не может никогда.
+  const real = await sendPhoto(request, TINY_PNG);
+  expect([200, 502, 503]).toContain(real.status());
+  const body = await real.json();
+  if (real.status() === 200) {
+    expect(Array.isArray(body.pins)).toBe(true);
+    expect(typeof body.indexed).toBe("number");
+  } else {
+    expect(typeof body.error).toBe("string");
+    expect(body.error.length).toBeGreaterThan(10);
+  }
+});
+
+test("поиск по фото ограничили по частоте: он платный", async ({ request }) => {
+  // Каждый запрос — вызов платного API эмбеддингов. Корзина — первый адрес из
+  // X-Forwarded-For, поэтому тест берёт свой адрес и не мешает остальным.
+  // Случайный последний октет может совпасть с чужой корзиной — тогда 429
+  // придёт раньше, что тесту и нужно.
+  const bucket = { "x-forwarded-for": `203.0.113.${1 + Math.floor(Math.random() * 254)}` };
+  const statuses: number[] = [];
+  for (let i = 0; i < 24 && !statuses.includes(429); i++) {
+    const res = await sendPhoto(request, TINY_PNG, bucket);
+    statuses.push(res.status());
+  }
+  expect(statuses).toContain(429);
+  expect(statuses[statuses.length - 1]).toBe(429);
 });

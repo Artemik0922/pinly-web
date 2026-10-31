@@ -2,54 +2,44 @@
 // Для демо-масштаба (сотни–тысячи пинов) JSON + полный перебор с
 // косинусной близостью быстрее и проще любой векторной БД.
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Pin } from "@/lib/pin";
+import { EMBEDDING_MODEL } from "@/lib/server/providers/embeddings";
 
 const STORE_PATH = join(process.cwd(), ".cache", "vectors.json");
 
-// Векторы разных моделей (и размерностей) несовместимы для cosine:
-// хранилище с другой версией/размерностью считаем пустым и
-// переиндексируем (npm run index).
-const EXPECTED_VERSION = 2;
-const EXPECTED_DIM = Number(process.env.EMBED_DIMENSIONS ?? 768);
+// Векторы разных моделей (и размерностей) несовместимы для cosine, поэтому
+// хранилище помнит имя модели напрямую: «version + dim» различить две модели
+// с одинаковой размерностью не могли. Несовместимое хранилище считаем пустым
+// и переиндексируем (npm run index).
+const STORE_VERSION = 3;
 
-type VectorItem = { pin: Pin; vector: number[] };
-type Store = { version: number; dim: number; items: VectorItem[] };
+/** Чем проиндексирован пин: текстом или самой картинкой. */
+export type VectorKind = "text" | "image";
+
+type VectorItem = { pin: Pin; vector: number[]; kind: VectorKind };
+type Store = { version: number; model: string; dim: number; items: VectorItem[] };
 
 let memory: Store | null = null;
 
-export function vectorStoreEnabled(): boolean {
-  return memory !== null && memory.items.length > 0;
+function emptyStore(): Store {
+  return { version: STORE_VERSION, model: EMBEDDING_MODEL.name, dim: EMBEDDING_MODEL.dim, items: [] };
 }
 
 export async function loadStore(): Promise<Store> {
   if (memory) return memory;
   try {
-    const raw = await readFile(STORE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Store;
-    if (parsed.version !== EXPECTED_VERSION || parsed.dim !== EXPECTED_DIM) {
-      // несовместимое хранилище (другая модель/размерность)
-      memory = { version: EXPECTED_VERSION, dim: EXPECTED_DIM, items: [] };
-    } else {
-      memory = parsed;
-    }
+    const parsed = JSON.parse(await readFile(STORE_PATH, "utf8")) as Partial<Store>;
+    const compatible =
+      parsed.version === STORE_VERSION &&
+      parsed.model === EMBEDDING_MODEL.name &&
+      parsed.dim === EMBEDDING_MODEL.dim;
+    memory = compatible ? (parsed as Store) : emptyStore();
   } catch {
-    memory = { version: EXPECTED_VERSION, dim: EXPECTED_DIM, items: [] };
+    memory = emptyStore();
   }
   return memory;
-}
-
-export async function saveStore(store: Store): Promise<void> {
-  memory = store;
-  await mkdir(join(process.cwd(), ".cache"), { recursive: true });
-  await writeFile(STORE_PATH, JSON.stringify(store));
-}
-
-export function upsertPins(store: Store, items: VectorItem[]): void {
-  const byId = new Map(store.items.map((it) => [it.pin.id, it]));
-  for (const item of items) byId.set(item.pin.id, item);
-  store.items = [...byId.values()];
 }
 
 export function cosine(a: number[], b: number[]): number {
@@ -65,16 +55,21 @@ export function cosine(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom;
 }
 
-// Ближайшие пины к вектору запроса, исключая excludeId.
+// Ближайшие пины к вектору запроса, исключая excludeId. Один пин может стоять
+// в индексе дважды (вектор по тексту и по картинке), поэтому берём лучший
+// score на пин: иначе в выдаче появляются одинаковые карточки.
 export async function searchVectors(
   queryVector: number[],
   topK: number,
   excludeId?: string,
 ): Promise<Array<{ pin: Pin; score: number }>> {
   const store = await loadStore();
-  return store.items
-    .filter((it) => it.pin.id !== excludeId)
-    .map((it) => ({ pin: it.pin, score: cosine(queryVector, it.vector) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK);
+  const best = new Map<string, { pin: Pin; score: number }>();
+  for (const it of store.items) {
+    if (it.pin.id === excludeId) continue;
+    const score = cosine(queryVector, it.vector);
+    const current = best.get(it.pin.id);
+    if (!current || score > current.score) best.set(it.pin.id, { pin: it.pin, score });
+  }
+  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, topK);
 }

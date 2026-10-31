@@ -10,12 +10,15 @@ import { searchPins } from "@/lib/api/feed";
 import { MasonryGrid } from "@/components/ui/MasonryGrid";
 import { CategoryChips } from "@/components/ui/CategoryChips";
 import { IconQuestion } from "@/components/ui/Icons";
+import { PhotoSearch } from "@/components/search/PhotoSearch";
+import { SearchModeTabs } from "@/components/search/SearchModeTabs";
 
 type Result = { q: string; pins: Pin[] };
 
 function SearchResults() {
   const params = useSearchParams();
   const q = params.get("q") ?? "";
+  const byPhoto = params.get("by") === "image";
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -43,6 +46,19 @@ function SearchResults() {
   const loading = !error && result?.q !== q;
   const pins = result?.q === q ? result.pins : [];
 
+  if (byPhoto) {
+    return (
+      <>
+        <CategoryChips />
+        <div className="mx-auto w-full max-w-[1800px] px-4">
+          <h1 className="py-2 text-lg font-bold">Поиск по фото</h1>
+          <SearchModeTabs />
+        </div>
+        <PhotoSearch />
+      </>
+    );
+  }
+
   return (
     <>
       <CategoryChips />
@@ -51,6 +67,8 @@ function SearchResults() {
           {q ? `Поиск: «${q}»` : "Что ищем?"}
           {pins.length > 0 && <span className="ml-2 font-normal text-muted">{pins.length}</span>}
         </h1>
+
+        <SearchModeTabs />
 
         {loading && <p className="py-10 text-center text-sm text-muted">Ищем…</p>}
 

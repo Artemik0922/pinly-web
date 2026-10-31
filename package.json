@@ -15,6 +15,7 @@
     "start": "next start",
     "warm": "node scripts/warm.mjs",
     "index": "node scripts/index-pins.mjs",
+    "probe:embeddings": "node scripts/probe-embeddings.mjs",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test:api": "python -m pytest backend/tests -q",

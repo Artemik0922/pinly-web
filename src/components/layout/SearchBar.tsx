@@ -6,7 +6,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
-import { IconSearch } from "@/components/ui/Icons";
+import { IconCamera, IconSearch } from "@/components/ui/Icons";
 
 export function SearchBar() {
   const router = useRouter();
@@ -28,13 +28,22 @@ export function SearchBar() {
       {/* На мобильном в шапке нет места на широкое поле: пять кнопок +
           логотип съедают строку, поле сжималось до иконки-кружка. Там поиск
           — иконкой на страницу поиска, на sm+ — прежнее поле. */}
-      <Link
-        href="/search"
-        aria-label="Поиск пинов"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface sm:hidden"
-      >
-        <IconSearch size={18} className="text-muted" />
-      </Link>
+      <div className="flex shrink-0 items-center gap-1 sm:hidden">
+        <Link
+          href="/search"
+          aria-label="Поиск пинов"
+          className="grid h-11 w-11 place-items-center rounded-full bg-surface"
+        >
+          <IconSearch size={18} className="text-muted" />
+        </Link>
+        <Link
+          href="/search?by=image"
+          aria-label="Поиск по фото"
+          className="grid h-11 w-11 place-items-center rounded-full bg-surface"
+        >
+          <IconCamera size={18} className="text-muted" />
+        </Link>
+      </div>
       <form
         className="hidden min-w-0 flex-1 sm:block"
         onSubmit={(e) => {
@@ -57,6 +66,14 @@ export function SearchBar() {
             aria-label="Поиск пинов"
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
+          <Link
+            href="/search?by=image"
+            aria-label="Поиск по фото"
+            title="Поиск по фото"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
+          >
+            <IconCamera size={17} />
+          </Link>
         </label>
       </form>
     </>
