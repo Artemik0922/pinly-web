@@ -87,7 +87,7 @@ function NewPinInner() {
   if (!enabled || !user) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold">Создание пинов — для своих</h1>
+        <h1 className="text-2xl font-extrabold sm:text-3xl">Создание пинов — для своих</h1>
         <p className="mt-3 text-muted">Войдите, чтобы загружать собственные идеи.</p>
         <Link
           href="/login"
@@ -138,12 +138,12 @@ function NewPinInner() {
   };
 
   return (
-    <div className="mx-auto max-w-[900px] px-4 py-8">
-      <h1 className="text-center text-2xl font-extrabold">Новый пин</h1>
+    <div className="mx-auto max-w-shell-narrow px-4 py-8">
+      <h1 className="text-center text-2xl font-extrabold sm:text-3xl">Новый пин</h1>
 
       <form
         onSubmit={submit}
-        className="mt-8 grid gap-6 rounded-[32px] bg-surface-card p-4 sm:p-6 md:grid-cols-2"
+        className="mt-8 grid gap-6 rounded-3xl bg-surface-card p-4 sm:p-6 md:grid-cols-2"
       >
         <PinDropzone maxFileMb={MAX_FILE_MB} image={image} onPick={pickFile} />
 

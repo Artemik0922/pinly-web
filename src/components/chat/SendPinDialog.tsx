@@ -78,7 +78,7 @@ export function SendPinDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Отправить пин в чат"
-        className="animate-pop flex max-h-[70vh] w-full max-w-sm flex-col rounded-3xl bg-background p-5 shadow-overlay ring-1 ring-border-soft"
+        className="animate-pop flex max-h-[70dvh] w-full max-w-sm flex-col rounded-3xl bg-background p-5 shadow-overlay ring-1 ring-border-soft"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">Отправить пин</h2>

@@ -13,7 +13,7 @@ export function CreateButton() {
     <Link
       href="/pin/new"
       aria-label="Создать пин"
-      className="grid h-11 w-11 place-items-center rounded-full bg-foreground text-background hover:opacity-90 sm:h-9 sm:w-9"
+      className="grid h-11 w-11 place-items-center rounded-full bg-foreground text-background hover:opacity-90"
     >
       <IconPlus size={18} />
     </Link>

@@ -41,7 +41,7 @@ export function MediaUploader({
   };
 
   return (
-    <div className="mx-auto mt-6 flex max-w-2xl flex-col gap-3">
+    <div className="mx-auto mt-6 flex max-w-shell-text flex-col gap-3">
       <div className="flex gap-2">
         <input
           value={url}

@@ -11,7 +11,7 @@ export function ChatHeader({ chat }: { chat: ApiChat | null }) {
       <Link
         href="/messages"
         aria-label="К списку чатов"
-        className="grid h-11 w-11 place-items-center rounded-full hover:bg-surface sm:h-9 sm:w-9"
+        className="grid h-11 w-11 place-items-center rounded-full hover:bg-surface"
       >
         <IconArrowLeft size={18} />
       </Link>

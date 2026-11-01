@@ -72,7 +72,7 @@ export function SearchBar() {
             href="/search?by=image&pick=1"
             aria-label="Поиск по фото"
             title="Поиск по фото"
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
           >
             <IconCamera size={16} />
           </Link>

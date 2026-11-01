@@ -58,7 +58,7 @@ export function ProfileEditor({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="mx-auto max-w-md px-4 py-10">
-      <h1 className="text-center text-2xl font-extrabold">Редактирование профиля</h1>
+      <h1 className="text-center text-2xl font-extrabold sm:text-3xl">Редактирование профиля</h1>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -111,7 +111,7 @@ export function ProfileEditor({ onDone }: { onDone: () => void }) {
           <button
             type="submit"
             disabled={busy}
-            className="flex-1 rounded-full bg-accent-strong py-3 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+            className="flex-1 rounded-full bg-accent-fill py-3 text-sm font-semibold text-accent-on hover:brightness-110 disabled:opacity-50"
           >
             {busy ? "Сохраняем…" : "Сохранить"}
           </button>

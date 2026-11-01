@@ -184,7 +184,7 @@ export function BoardView({
     };
 
     return (
-      <div className="mx-auto w-full max-w-[1240px] px-4 py-6">
+      <div className="mx-auto w-full max-w-shell px-4 py-6">
         <div className="text-center">
           {editing ? (
             <form
@@ -210,7 +210,7 @@ export function BoardView({
             </form>
           ) : (
             <div className="flex items-center justify-center gap-2">
-              <h1 className="text-3xl font-extrabold">{board.title}</h1>
+              <h1 className="text-2xl font-extrabold sm:text-3xl">{board.title}</h1>
               <button
                 type="button"
                 aria-label="Переименовать доску"
@@ -231,7 +231,7 @@ export function BoardView({
             <button
               type="button"
               onClick={shareBoard}
-              className="flex min-h-11 items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90"
+              className="flex min-h-11 items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90"
             >
               <IconShare size={14} />
               Поделиться
@@ -241,7 +241,7 @@ export function BoardView({
                 type="button"
                 onClick={() => toggleSecret(board.id)}
                 aria-pressed={!!board.isSecret}
-                className={`flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold hover:bg-surface-hover ${
+                className={`flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold hover:bg-surface-hover ${
                   board.isSecret ? "bg-surface text-foreground" : "text-muted"
                 }`}
               >
@@ -309,14 +309,14 @@ export function BoardView({
 
   if (foreign) {
     return (
-      <div className="mx-auto w-full max-w-[1240px] px-4 py-6">
+      <div className="mx-auto w-full max-w-shell px-4 py-6">
         <div className="text-center">
-          <h1 className="text-3xl font-extrabold">{foreign.title}</h1>
+          <h1 className="text-2xl font-extrabold sm:text-3xl">{foreign.title}</h1>
           <p className="mt-1 text-sm text-muted">{pinCountLabel(boardPinCount(foreign))}</p>
           {foreign.owner && (
             <Link
               href={`/profile/${foreign.owner.id}`}
-              className="mt-3 inline-flex items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold hover:bg-surface-card"
+              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-4 text-sm font-semibold hover:bg-surface-card"
             >
               Доска {foreign.owner.name}
             </Link>

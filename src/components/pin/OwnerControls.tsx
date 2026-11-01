@@ -15,7 +15,7 @@ import { IconPencil, IconTrash } from "@/components/ui/Icons";
 const FIELD =
   "w-full rounded-xl bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40";
 const ICON_BUTTON =
-  "grid h-11 w-11 place-items-center rounded-full text-muted hover:bg-surface-hover sm:h-9 sm:w-9";
+  "grid h-11 w-11 place-items-center rounded-full text-muted hover:bg-surface-hover";
 
 export function OwnerControls({ pin }: { pin: Pin }) {
   const { user } = useUser();
@@ -113,7 +113,7 @@ export function OwnerControls({ pin }: { pin: Pin }) {
             type="button"
             onClick={save}
             disabled={busy}
-            className="rounded-full bg-accent-strong px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+            className="rounded-full bg-accent-fill px-4 py-2 text-sm font-semibold text-accent-on hover:brightness-110 disabled:opacity-50"
           >
             Сохранить
           </button>

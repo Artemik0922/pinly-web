@@ -39,7 +39,7 @@ export function ChatView({ chatId }: { chatId: string }) {
 
   if (error) {
     return (
-      <main className="mx-auto w-full max-w-2xl px-4 py-10 text-center">
+      <main className="mx-auto w-full max-w-shell-text px-4 py-10 text-center">
         <p className="text-sm text-danger" role="alert">
           {error}
         </p>
@@ -54,7 +54,7 @@ export function ChatView({ chatId }: { chatId: string }) {
   }
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-4.5rem)] w-full max-w-2xl flex-col px-4 pb-4">
+    <main className="mx-auto flex min-h-[calc(100dvh-4.5rem)] w-full max-w-shell-text flex-col px-4 pb-4">
       <ChatHeader chat={chat} />
 
       <MessageList

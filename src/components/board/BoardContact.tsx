@@ -39,7 +39,7 @@ export function BoardContact({
   };
 
   const primary =
-    "flex min-h-11 items-center gap-2 rounded-full bg-accent-strong px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60";
+    "flex min-h-11 items-center gap-2 rounded-full bg-accent-fill px-5 py-2.5 text-sm font-semibold text-accent-on hover:brightness-110 disabled:opacity-60";
 
   return (
     <section className="mt-8 rounded-2xl bg-surface-card px-4 py-5 sm:px-6">

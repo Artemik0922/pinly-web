@@ -17,7 +17,7 @@ export function MediaGrid({
   const router = useRouter();
 
   if (items === null) {
-    return <p className="py-16 text-center text-sm text-muted/80">Загрузка…</p>;
+    return <p className="py-16 text-center text-sm text-muted">Загрузка…</p>;
   }
 
   if (items.length === 0) {
@@ -37,7 +37,7 @@ export function MediaGrid({
             {/* eslint-disable-next-line @next/next/no-img-element -- свой маршрут /api/uploads */}
             <img src={item.url} alt={item.title || "Картинка"} className="w-full" />
             <div className="flex items-center gap-1 p-2">
-              <span className="min-w-0 flex-1 truncate text-xs text-muted/80">
+              <span className="min-w-0 flex-1 truncate text-xs text-muted">
                 {item.title || "Без названия"}
               </span>
               <button

@@ -27,7 +27,7 @@ export function Composer({
 
   return (
     <div className="sticky bottom-0 -mx-4 mt-3 border-t border-border-soft bg-background/95 px-4 py-3 backdrop-blur">
-      <div className="mx-auto flex max-w-2xl items-end gap-2">
+      <div className="mx-auto flex max-w-shell-text items-end gap-2">
         <button
           type="button"
           onClick={onOpenPicker}

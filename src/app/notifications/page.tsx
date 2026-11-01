@@ -75,7 +75,7 @@ function Row({ item }: { item: NotificationItem }) {
                 name={item.actor.name}
                 url={item.actor.avatarUrl}
                 size={22}
-                textSize="text-[10px]"
+                textSize="text-[11px]"
               />
             </span>
             <span className="truncate font-semibold">{item.actor.name}</span>
@@ -124,8 +124,8 @@ export default function NotificationsPage() {
   if (!user) return <SignInGate title="Уведомления" hint="Войдите в аккаунт, чтобы видеть оценки, сохранения и подписки." />;
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-6">
-      <h1 className="flex items-center gap-2 py-2 text-lg font-bold">
+    <main className="mx-auto w-full max-w-shell-text px-4 py-6">
+      <h1 className="flex items-center gap-2 py-2 text-2xl font-extrabold sm:text-3xl">
         <IconBell size={20} />
         Уведомления
       </h1>

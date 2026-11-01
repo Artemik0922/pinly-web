@@ -48,7 +48,7 @@ export function BoardStats({ boardId }: { boardId: string }) {
 
   return (
     <details
-      className="mx-auto mt-4 max-w-2xl rounded-2xl bg-surface px-4 py-3 text-left"
+      className="mx-auto mt-4 max-w-shell-text rounded-2xl bg-surface px-4 py-3 text-left"
       onToggle={(e) => setOpened(e.currentTarget.open)}
     >
       <summary className="cursor-pointer text-sm font-semibold">Цифры доски</summary>

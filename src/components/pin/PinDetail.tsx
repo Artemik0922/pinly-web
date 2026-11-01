@@ -33,7 +33,7 @@ function LikeButton({ pinId, baseLikes }: { pinId: string; baseLikes: number }) 
       onClick={() => toggle(pinId)}
       aria-pressed={liked}
       aria-label={liked ? "Убрать лайк" : "Поставить лайк"}
-      className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-sm transition-colors ${
+      className={`flex min-h-11 items-center gap-2 rounded-full px-4 text-sm transition-colors ${
         liked ? "text-accent-strong" : "text-muted hover:bg-surface"
       }`}
     >
@@ -85,15 +85,15 @@ export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
   }, [pin.id]);
 
   return (
-    <div className="mx-auto w-full max-w-[1050px] px-4">
+    <div className="mx-auto w-full max-w-shell px-4">
       <Link
         href="/"
-        className="mt-4 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-muted hover:bg-surface"
+        className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold text-muted hover:bg-surface"
       >
         <IconArrowLeft size={16} />В ленту
       </Link>
 
-      <section className="mt-4 grid gap-8 rounded-[32px] bg-surface-card p-4 sm:p-6 md:grid-cols-2">
+      <section className="mt-4 grid gap-8 rounded-3xl bg-surface-card p-4 sm:p-6 md:grid-cols-2">
         <div className="m-auto w-full">
           <PinImage pin={pin} preload sizes="(max-width: 768px) 92vw, 45vw" />
         </div>
@@ -105,14 +105,14 @@ export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
           </div>
           <PinActions pin={pin} />
 
-          <h1 className="mt-4 text-2xl font-bold leading-snug sm:text-3xl">{pin.title}</h1>
+          <h1 className="mt-4 text-2xl font-extrabold leading-snug sm:text-3xl">{pin.title}</h1>
           {pin.description && (
             <p className="mt-3 leading-relaxed text-foreground">{pin.description}</p>
           )}
 
           <Link
             href={categoryHref(pin.category)}
-            className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-background px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-black/5 hover:bg-surface"
+            className="mt-5 inline-flex w-fit items-center gap-2 rounded-full border border-border-soft bg-background px-4 py-2.5 text-sm font-semibold hover:bg-surface"
           >
             {pin.category}
           </Link>
@@ -122,7 +122,7 @@ export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
               <li key={tag}>
                 <Link
                   href={`/search?q=${encodeURIComponent(tag)}`}
-                  className="block rounded-full bg-background px-3 py-1.5 text-sm text-muted shadow-sm ring-1 ring-black/5 hover:bg-surface"
+                  className="flex min-h-11 items-center rounded-full border border-border-soft bg-background px-3 py-2 text-sm text-muted hover:bg-surface"
                 >
                   #{tag}
                 </Link>

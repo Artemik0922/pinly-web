@@ -50,7 +50,7 @@ const GARLAND: Array<[number, number, number, string]> = [
 
 export default function PinNotFound() {
   return (
-    <main className="mx-auto grid min-h-[calc(100vh-9rem)] w-full max-w-2xl place-items-center px-4 py-16 text-center">
+    <main className="mx-auto grid min-h-[calc(100dvh-9rem)] w-full max-w-shell-text place-items-center px-4 py-16 text-center">
       <div>
         <div className="relative mx-auto h-[150px] w-[200px]" aria-hidden>
           <svg
@@ -77,7 +77,7 @@ export default function PinNotFound() {
           </span>
         </div>
 
-        <h1 className="mt-8 text-2xl font-extrabold">Пин не найден</h1>
+        <h1 className="mt-8 text-2xl font-extrabold sm:text-3xl">Пин не найден</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
           Возможно, автор удалил его, а ссылка осталась из закладок. Похожие
           идеи точно есть в ленте.
@@ -91,7 +91,7 @@ export default function PinNotFound() {
           </Link>
           <Link
             href="/search"
-            className="flex items-center gap-1.5 rounded-full bg-surface px-5 py-2.5 text-sm font-semibold hover:bg-surface-hover"
+            className="flex items-center gap-2 rounded-full bg-surface px-5 py-2.5 text-sm font-semibold hover:bg-surface-hover"
           >
             <IconSearch size={15} />
             Поиск

@@ -17,7 +17,7 @@ import { usePhotoSearch } from "@/components/search/usePhotoSearch";
 
 // Ширина панели: на 1920 px строка поиска во всю ширину превращается в бегущую
 // полосу, где поле и кнопка не видны одновременно.
-const PANEL = "mx-auto w-full max-w-[1120px] px-4";
+const PANEL = "mx-auto w-full max-w-shell px-4";
 
 function SearchField({ q }: { q: string }) {
   const router = useRouter();
@@ -53,7 +53,7 @@ function SearchField({ q }: { q: string }) {
           type="button"
           onClick={() => setTyped("")}
           aria-label="Очистить запрос"
-          className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-hover"
         >
           ×
         </button>
@@ -126,7 +126,7 @@ function SearchResults() {
                   </p>
                   <Link
                     href="/"
-                    className="mt-4 inline-block rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
+                    className="mt-4 inline-flex min-h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background hover:opacity-90"
                   >
                     Вернуться в ленту
                   </Link>

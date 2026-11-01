@@ -73,10 +73,10 @@ export function SaveControls({ pin, size = "compact" }: { pin: Pin; size?: "comp
   const large = size === "large";
   const triggerClass = large
     ? "flex min-h-11 items-center gap-1 rounded-full bg-surface px-4 text-sm font-semibold text-foreground hover:bg-surface-hover"
-    : "flex min-h-9 max-w-28 items-center gap-1 rounded-full bg-background/95 px-3 text-xs font-semibold text-foreground hover:bg-background sm:min-h-11";
+    : "flex min-h-11 max-w-28 items-center gap-2 rounded-full bg-background/95 px-3 text-xs font-semibold text-foreground hover:bg-background";
   const saveClass = savedHere
     ? "flex min-h-9 items-center justify-center rounded-full bg-foreground px-3 text-xs font-semibold text-background sm:min-h-11 sm:px-5 sm:text-sm"
-    : "flex min-h-9 items-center justify-center rounded-full bg-accent-strong px-3 text-xs font-semibold text-white hover:brightness-110 sm:min-h-11 sm:px-5 sm:text-sm";
+    : "flex min-h-11 items-center justify-center rounded-full bg-accent-fill px-4 text-sm font-semibold text-accent-on hover:brightness-110";
 
   return (
     <div className="relative">
@@ -141,7 +141,7 @@ export function SaveControls({ pin, size = "compact" }: { pin: Pin; size?: "comp
                     >
                       <span
                         className={`grid h-5 w-5 shrink-0 place-items-center rounded-md ${
-                          checked ? "bg-accent-strong text-white" : "bg-surface text-transparent"
+                          checked ? "bg-accent-fill text-accent-on" : "bg-surface text-transparent"
                         }`}
                       >
                         <IconCheck size={12} />

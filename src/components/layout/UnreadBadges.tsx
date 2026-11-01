@@ -12,7 +12,7 @@ import { useUnreadCount } from "@/components/layout/useUnreadCount";
 function UnreadCount({ unread }: { unread: number }) {
   if (unread <= 0) return null;
   return (
-    <span className="absolute -right-0.5 -top-0.5 grid min-w-5 place-items-center rounded-full bg-accent-strong px-1 text-[10px] font-bold leading-5 text-white">
+    <span className="absolute -right-0.5 -top-0.5 grid min-w-5 place-items-center rounded-full bg-accent-fill px-1 text-[11px] font-bold leading-5 text-accent-on">
       {unread > 99 ? "99+" : unread}
     </span>
   );
@@ -28,7 +28,7 @@ export function NotificationBell() {
       aria-label={
         unread > 0 ? `Уведомления: ${unread} непрочитанных` : "Уведомления"
       }
-      className="relative grid h-11 w-11 place-items-center rounded-full text-foreground hover:bg-surface-hover sm:h-9 sm:w-9"
+      className="relative grid h-11 w-11 place-items-center rounded-full text-foreground hover:bg-surface-hover"
     >
       <IconBell size={20} />
       <UnreadCount unread={unread} />
@@ -46,7 +46,7 @@ export function MessagesLink() {
     <Link
       href="/messages"
       aria-label={unread > 0 ? `Сообщения: ${unread} непрочитанных` : "Сообщения"}
-      className="relative grid h-11 w-11 place-items-center rounded-full text-foreground hover:bg-surface-hover sm:h-9 sm:w-9"
+      className="relative grid h-11 w-11 place-items-center rounded-full text-foreground hover:bg-surface-hover"
     >
       <IconMessage size={20} />
       <UnreadCount unread={unread} />

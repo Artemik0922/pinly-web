@@ -56,7 +56,7 @@ const LEAVES = branchLeaves();
 
 export default function NotFound() {
   return (
-    <main className="mx-auto grid min-h-[calc(100vh-9rem)] w-full max-w-2xl place-items-center px-4 py-16 text-center">
+    <main className="mx-auto grid min-h-[calc(100dvh-9rem)] w-full max-w-shell-text place-items-center px-4 py-16 text-center">
       <div>
         <p className="sr-only">Ошибка 404</p>
         <div
@@ -103,7 +103,7 @@ export default function NotFound() {
           <span>4</span>
         </div>
 
-        <h1 className="mt-8 text-2xl font-extrabold">Такой страницы нет</h1>
+        <h1 className="mt-8 text-2xl font-extrabold sm:text-3xl">Такой страницы нет</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
           Возможно, она переехала или её никогда не существовало. Идеи —
           в ленте.
@@ -117,7 +117,7 @@ export default function NotFound() {
           </Link>
           <Link
             href="/search"
-            className="flex items-center gap-1.5 rounded-full bg-surface px-5 py-2.5 text-sm font-semibold hover:bg-surface-hover"
+            className="flex items-center gap-2 rounded-full bg-surface px-5 py-2.5 text-sm font-semibold hover:bg-surface-hover"
           >
             <IconSearch size={15} />
             Поиск

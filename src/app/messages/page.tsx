@@ -37,7 +37,7 @@ function ChatRow({ chat }: { chat: ApiChat }) {
           <p className={`truncate text-sm ${unread ? "font-bold" : "font-semibold"}`}>
             {chat.member.displayName}
           </p>
-          <p className={`flex items-center gap-1.5 truncate text-sm ${unread ? "text-foreground" : "text-muted"}`}>
+          <p className={`flex items-center gap-2 truncate text-sm ${unread ? "text-foreground" : "text-muted"}`}>
             {chat.lastMessage?.kind === "pin" && <IconPin size={14} className="shrink-0" />}
             {preview(chat)}
           </p>
@@ -47,7 +47,7 @@ function ChatRow({ chat }: { chat: ApiChat }) {
           {unread && (
             <span
               aria-label="непрочитано"
-              className="grid min-w-5 place-items-center rounded-full bg-accent-strong px-1 text-[10px] font-bold leading-5 text-white"
+              className="grid min-w-5 place-items-center rounded-full bg-accent-fill px-1 text-[11px] font-bold leading-5 text-accent-on"
             >
               {chat.unread > 99 ? "99+" : chat.unread}
             </span>
@@ -93,8 +93,8 @@ export default function MessagesPage() {
   if (!user) return <SignInGate title="Сообщения" hint="Войдите в аккаунт, чтобы переписываться и отправлять пины." />;
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-6">
-      <h1 className="flex items-center gap-2 py-2 text-lg font-bold">
+    <main className="mx-auto w-full max-w-shell-text px-4 py-6">
+      <h1 className="flex items-center gap-2 py-2 text-2xl font-extrabold sm:text-3xl">
         <IconMessage size={20} />
         Сообщения
       </h1>

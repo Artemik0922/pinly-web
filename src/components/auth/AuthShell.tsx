@@ -21,12 +21,12 @@ export function AuthShell({
   linkLabel: string;
 }) {
   return (
-    <div className="mx-auto max-w-md px-4 py-14">
-      <h1 className="text-center text-2xl font-extrabold">{title}</h1>
+    <div className="mx-auto max-w-shell-form px-4 py-14">
+      <h1 className="text-center text-2xl font-extrabold sm:text-3xl">{title}</h1>
       {children}
       <p className="mt-8 text-center text-sm text-muted">
         {question}{" "}
-        <Link href={href} className="font-semibold text-accent-strong hover:underline">
+        <Link href={href} className="inline-flex min-h-11 items-center px-1 font-semibold text-accent-strong hover:underline">
           {linkLabel}
         </Link>
       </p>

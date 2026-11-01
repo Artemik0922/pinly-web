@@ -59,7 +59,7 @@ export function Field({
             onClick={() => setShown((v) => !v)}
             aria-label={shown ? "Скрыть пароль" : "Показать пароль"}
             aria-pressed={shown}
-            className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground"
+            className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground"
           >
             {shown ? <IconEyeOff size={16} /> : <IconEye size={16} />}
           </button>

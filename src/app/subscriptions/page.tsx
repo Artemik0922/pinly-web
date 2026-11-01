@@ -10,10 +10,10 @@ export default function SubscriptionsPage() {
   const { user, ready, enabled } = useUser();
 
   return (
-    <div className="mx-auto w-full max-w-[1800px] px-4 py-6">
-      <h1 className="text-center text-2xl font-extrabold">Подписки</h1>
+    <div className="mx-auto w-full max-w-shell-wide px-4 py-6">
+      <h1 className="text-center text-2xl font-extrabold sm:text-3xl">Подписки</h1>
       {!ready ? (
-        <p className="py-20 text-center text-sm text-muted/80">Загрузка…</p>
+        <p className="py-20 text-center text-sm text-muted">Загрузка…</p>
       ) : !enabled || !user ? (
         <div className="py-20 text-center">
           <p className="text-muted">Войдите, чтобы следить за любимыми авторами.</p>

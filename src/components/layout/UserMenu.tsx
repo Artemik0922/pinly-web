@@ -69,7 +69,7 @@ export function UserMenu() {
         aria-label="Меню пользователя"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="grid h-11 w-11 place-items-center rounded-full bg-foreground text-background sm:h-9 sm:w-9"
+        className="grid h-11 w-11 place-items-center rounded-full bg-foreground text-background"
       >
         <IconUser size={18} />
       </button>

@@ -12,7 +12,7 @@ export default function AppError({ reset }: { error: Error; reset: () => void })
       <p className="grid place-items-center text-muted">
         <IconCompass size={40} />
       </p>
-      <h1 className="mt-4 text-xl font-bold">Что-то пошло не так</h1>
+      <h1 className="mt-4 text-2xl font-extrabold sm:text-3xl">Что-то пошло не так</h1>
       <p className="mt-2 text-sm text-muted">
         Страница не отрисовалась. Можно попробовать ещё раз — или вернуться в ленту.
       </p>

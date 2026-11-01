@@ -145,11 +145,11 @@ export function PublicProfile({
   const name = profile.displayName || "Пользователь";
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 py-8">
+    <div className="mx-auto w-full max-w-shell px-4 py-8">
       <div className="flex flex-wrap items-center gap-4">
         <Avatar name={name} url={profile.avatarUrl} size={72} textSize="text-lg" />
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold">{name}</h1>
+          <h1 className="text-2xl font-extrabold sm:text-3xl">{name}</h1>
           <p className="mt-1 text-sm text-muted">
             {countLabel(profile.pinsCount, "пин", "пина", "пинов")} ·{" "}
             {countLabel(profile.boardsCount, "открытая доска", "открытые доски", "открытых досок")}{" "}

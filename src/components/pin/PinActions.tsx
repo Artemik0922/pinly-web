@@ -24,7 +24,7 @@ const SHARE_NETWORKS = {
 type ShareNetwork = keyof typeof SHARE_NETWORKS;
 
 const ICON_BUTTON =
-  "grid h-11 w-11 place-items-center rounded-full text-muted hover:bg-surface-hover sm:h-9 sm:w-9";
+  "grid h-11 w-11 place-items-center rounded-full text-muted hover:bg-surface-hover";
 
 export function PinActions({ pin }: { pin: Pin }) {
   const [copied, setCopied] = useState(false);
@@ -65,7 +65,7 @@ export function PinActions({ pin }: { pin: Pin }) {
           {countLabel(pin.saves, "сохранение", "сохранения", "сохранений")}
         </span>
       )}
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         {ready && enabled && user && (
           <button
             type="button"
@@ -88,7 +88,7 @@ export function PinActions({ pin }: { pin: Pin }) {
           type="button"
           onClick={copyLink}
           aria-label="Копировать ссылку"
-          className={`flex items-center gap-1.5 rounded-full px-3 py-2 hover:bg-surface ${
+          className={`flex min-h-11 items-center gap-2 rounded-full px-3 hover:bg-surface ${
             copied ? "text-accent-strong" : "text-muted"
           }`}
         >
@@ -106,7 +106,7 @@ export function PinActions({ pin }: { pin: Pin }) {
             key={network}
             type="button"
             onClick={() => openShare(network)}
-            className="rounded-full px-3 py-2 text-sm text-muted hover:bg-surface"
+            className="inline-flex min-h-11 items-center rounded-full px-3 text-sm text-muted hover:bg-surface"
           >
             {label}
           </button>

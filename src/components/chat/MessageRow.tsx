@@ -59,7 +59,7 @@ export function MessageRow({
               {m.text}
             </p>
           )}
-          {m.pending && <span className="text-[10px] text-muted">Отправляем…</span>}
+          {m.pending && <span className="text-[11px] text-muted">Отправляем…</span>}
         </div>
       ) : (
         <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
@@ -72,7 +72,7 @@ export function MessageRow({
           >
             {m.text}
             <span
-              className={`mt-1 block text-right text-[10px] ${
+              className={`mt-1 block text-right text-[11px] ${
                 mine ? "text-background/60" : "text-muted"
               }`}
             >

@@ -32,7 +32,7 @@ export function CategoryChips({ active, feed }: { active?: string; feed?: string
   );
 
   return (
-    <nav aria-label="Категории ленты" className="relative mx-auto w-full max-w-[1800px] px-4 py-1">
+    <nav aria-label="Категории ленты" className="relative mx-auto w-full max-w-shell-wide px-4 py-1">
       {/* градиент справа подсказывает, что ленту чипсов можно крутить */}
       <ul
         className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

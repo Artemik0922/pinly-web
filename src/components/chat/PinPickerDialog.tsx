@@ -81,7 +81,7 @@ export function PinPickerDialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="animate-pop flex max-h-[80vh] w-full max-w-lg flex-col rounded-3xl bg-background p-5 shadow-overlay ring-1 ring-border-soft"
+        className="animate-pop flex max-h-[80dvh] w-full max-w-lg flex-col rounded-3xl bg-background p-5 shadow-overlay ring-1 ring-border-soft"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">{title}</h2>

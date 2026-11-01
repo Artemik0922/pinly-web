@@ -51,7 +51,7 @@ function BoardCard({ id }: { id: string }) {
             </div>
           )}
         </div>
-        <p className="mt-2 flex items-center gap-1.5 font-semibold">
+        <p className="mt-2 flex items-center gap-2 font-semibold">
           {board.title}
           {board.isSecret && (
             <span className="flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-muted">
@@ -132,9 +132,9 @@ export default function BoardsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 py-6">
+    <div className="mx-auto w-full max-w-shell px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-extrabold">Ваши доски</h1>
+        <h1 className="text-2xl font-extrabold sm:text-3xl">Ваши доски</h1>
         <div className="flex flex-wrap items-center gap-3">
           <input
             value={title}

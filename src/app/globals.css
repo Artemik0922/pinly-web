@@ -6,7 +6,13 @@
    на кнопках и для текста-ссылок (WCAG AA ≥ 4.5:1). */
 :root {
   --accent: #2fbf9b; /* мятный */
-  --accent-strong: #0f7f66; /* текст и кнопки */
+  --accent-strong: #0f7f66; /* текст-ссылка на светлом */
+  /* Залитая кнопка: фон и текст держатся парой. В светлой теме accent-strong
+     достаточно тёмный для белого текста (4.94:1), в тёмной он просветлён —
+     и белый на нём даёт уже 2.65:1, то есть провал AA. Поэтому фон кнопки —
+     отдельный токен, а не «тот же акцент потемнее». */
+  --accent-fill: #0f7f66;
+  --accent-on: #ffffff;
   --background: #ffffff;
   --foreground: #111111;
   --surface: rgba(0, 0, 0, 0.05);
@@ -25,6 +31,7 @@
   --background: #0e0f11;
   --foreground: #ececec;
   --accent-strong: #29b38f; /* на тёмном фоне белый текст не нужен, а этот тон читается */
+  --accent-fill: #0b6b52; /* а вот белый текст на залитой кнопке — нужен: 6.48:1 */
   --surface: rgba(255, 255, 255, 0.08);
   --surface-card: rgba(255, 255, 255, 0.05);
   --surface-hover: rgba(255, 255, 255, 0.12);
@@ -39,6 +46,8 @@
 @theme inline {
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-on: var(--accent-on);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
@@ -54,9 +63,20 @@
   --animate-pop: pop 180ms var(--motion-ease) both;
   --animate-sink: sink 160ms ease-in both;
   --font-sans: var(--font-geist-sans);
-  /* моноширинный не используется ни в одном компоненте —
+  /* Моноширинный не используется ни в одном компоненте —
      системный стек вместо отдельного веб-шрифта */
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Ширина страницы. Раньше на каждом экране стояла своё число (1800, 1400,
+     1240, 1120, 1050, 900), из-за чего одна и та же витрина то дышала, то
+     сжималась. Теперь шкала: лента → wide, детальная страница (доска, профиль,
+     пин, поиск) → shell, загрузка/форма → narrow, юридический текст → text,
+     поля входа → form. */
+  --container-shell-wide: 1800px;
+  --container-shell: 1240px;
+  --container-shell-narrow: 900px;
+  --container-shell-text: 672px;
+  --container-shell-form: 448px;
 }
 
 html {
@@ -137,7 +157,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 20px;
   background: var(--background);
   color: var(--foreground);
   opacity: 0;
@@ -177,7 +197,9 @@ html[data-splash="on"] body {
 }
 
 .splash-word {
-  font-size: 1.05rem;
+  /* 1rem вместо 1.05rem: размер вне шкалы заметен рядом с остальным текстом,
+     а роль слова «Pinly» держит вес, а не дробная линия */
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }

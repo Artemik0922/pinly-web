@@ -86,11 +86,11 @@ export function ProfileView({ id }: { id: string }) {
   const nameShown = user.displayName || "Профиль";
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-8">
+    <div className="mx-auto max-w-shell px-4 py-8">
       <div className="flex items-center gap-4">
         <Avatar name={nameShown} url={user.avatarUrl} size={64} textSize="text-lg" />
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold">{nameShown}</h1>
+          <h1 className="text-2xl font-extrabold sm:text-3xl">{nameShown}</h1>
           <p className="text-sm text-muted">{user.email}</p>
         </div>
         <div className="ml-auto flex flex-col items-end gap-2">
@@ -136,7 +136,7 @@ export function ProfileView({ id }: { id: string }) {
                 href={`/board/${board.id}`}
                 className="block rounded-2xl bg-surface-card p-4 hover:bg-surface-hover"
               >
-                <p className="flex items-center gap-1.5 truncate font-semibold">
+                <p className="flex items-center gap-2 truncate font-semibold">
                   {board.title}
                   {board.isSecret && <IconLock size={13} className="shrink-0 text-muted" />}
                 </p>

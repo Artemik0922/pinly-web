@@ -13,13 +13,13 @@ export default function MediaPage() {
   const library = useMediaLibrary();
 
   if (!library.ready) {
-    return <p className="py-20 text-center text-sm text-muted/80">Загрузка…</p>;
+    return <p className="py-20 text-center text-sm text-muted">Загрузка…</p>;
   }
 
   if (!library.enabled || !library.user) {
     return (
       <div className="py-20 text-center">
-        <h1 className="text-2xl font-extrabold">Медиатека — для своих</h1>
+        <h1 className="text-2xl font-extrabold sm:text-3xl">Медиатека — для своих</h1>
         <p className="mt-3 text-muted">Войдите, чтобы хранить свои картинки.</p>
         <Link
           href="/login"
@@ -32,9 +32,9 @@ export default function MediaPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 py-8">
-      <h1 className="text-center text-2xl font-extrabold">Медиатека</h1>
-      <p className="mt-2 text-center text-sm text-muted/80">
+    <div className="mx-auto w-full max-w-shell px-4 py-8">
+      <h1 className="text-center text-2xl font-extrabold sm:text-3xl">Медиатека</h1>
+      <p className="mt-2 text-center text-sm text-muted">
         Ваше хранилище картинок: файлом или по ссылке с любого хостинга.
         Из хранилища — пины в один клик.
       </p>
