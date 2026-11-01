@@ -38,6 +38,20 @@ const VIEWPORTS = [
   { width: 1280, height: 800, name: "desktop" },
 ];
 
+// Витринные адреса живые: доска мастера и профиль — ровно те страницы, которые
+// человек открывает по расшаренной ссылке, поэтому брать их надо из карты сайта,
+// а не из захардкоженного id, который завтра удалён.
+async function liveShowcaseRoutes(page) {
+  try {
+    const xml = await (await page.goto(BASE + "/sitemap.xml")).text();
+    const paths = [...xml.matchAll(/<loc>[^<]*?(\/(?:board|profile|pin)\/[^<]+)<\/loc>/g)].map((m) => m[1]);
+    const one = (kind) => paths.find((p) => p.startsWith(kind));
+    return ["/board/", "/profile/", "/pin/"].map(one).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 // Шкала (DESIGN.md): лента широкая, детальная страница — средняя, форма —
 // узкая, юридический текст — текстовая колонка, поля входа — своя.
 const SHELLS = [1800, 1240, 900, 672, 448];
@@ -97,6 +111,7 @@ const probe = (limits) => {
 
 const browser = await chromium.launch();
 const problems = [];
+let checked = 0;
 
 for (const vp of VIEWPORTS) {
   const ctx = await browser.newContext({ viewport: vp });
@@ -108,8 +123,9 @@ for (const vp of VIEWPORTS) {
     } catch {}
   });
   const page = await ctx.newPage();
+  const routes = [...ROUTES, ...(await liveShowcaseRoutes(page))];
 
-  for (const path of ROUTES) {
+  for (const path of routes) {
     try {
       await page.goto(BASE + path, { waitUntil: "domcontentloaded" });
     } catch {
@@ -117,6 +133,7 @@ for (const vp of VIEWPORTS) {
       continue;
     }
     await page.waitForTimeout(900);
+    checked++;
     const r = await page.evaluate(probe, { minTap: MIN_TAP });
 
     for (const w of r.shells) {
@@ -153,6 +170,6 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(
-  `дизайн-аудит: чисто — ${ROUTES.length} адресов × ${VIEWPORTS.length} ширины, ` +
+  `дизайн-аудит: чисто — ${checked} проверок (адрес × ширина, включая живые витрины из карты), ` +
     `шкалы: ширины ${SHELLS.join("/")}, радиусы ${RADII.join("/")}+pill, сетка 4px, тап ≥${MIN_TAP}px`,
 );
