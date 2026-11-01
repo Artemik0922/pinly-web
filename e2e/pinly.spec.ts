@@ -213,7 +213,22 @@ test("доска отдаёт превью для мессенджера и кн
   await page.getByRole("menuitemcheckbox", { name: title }).click();
   await expect(page.getByRole("button", { name: "Сохранено" })).toBeVisible();
 
-  // og:image читаем из серверного HTML: боты мессенджеров cookies не носят
+  // og:image читаем из серверного HTML: боты мессенджеров cookies не носят.
+  // Сначала — что сохранённая работа действительно видна в публичном срезе:
+  // превью строится по первому пину, а PUT отвечает 204 раньше, чем очередь
+  // SQLite успевает стать видна читателю. Без этого шага проверка превращалась
+  // в гонку и падала ровно тогда, когда бэкенд занят регистрациями.
+  const boardId = boardPath.split("/").pop()!;
+  await expect
+    .poll(
+      async () => {
+        const body = await (await request.get(`/api/boards/${boardId}/public`)).json();
+        return body.board?.pins?.length ?? 0;
+      },
+      { timeout: 20_000 },
+    )
+    .toBeGreaterThan(0);
+
   const html = await (await request.get(boardPath)).text();
   expect(html).toContain('property="og:image" content="http');
   expect(html).toContain(`property="og:title" content="${title}`);
