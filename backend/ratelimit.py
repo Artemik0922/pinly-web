@@ -17,7 +17,21 @@ _attempts: dict[str, list[float]] = {}
 _MAX_TRACKED_BUCKETS = 10_000
 
 
+def disabled() -> bool:
+    """PINLY_DISABLE_RATE_LIMIT=1 выключает счётчики целиком.
+
+    Нужен тестовому контуру: Playwright создаёт доски и комментирует с одного
+    адреса десятки раз за прогон, и лимит «не спамь» начинает отбивать
+    легитимные запросы — тесты падают по причине, не связанной с проверкой.
+    В проде флаг не ставят; читать env при каждом вызове, чтобы тест мог его
+    переключить без перезапуска.
+    """
+    return os.environ.get("PINLY_DISABLE_RATE_LIMIT") == "1"
+
+
 def _rate_limit(bucket: str, limit: int, window_s: float) -> None:
+    if disabled():
+        return
     now = time.time()
     hits = [t for t in _attempts.get(bucket, []) if now - t < window_s]
     if len(hits) >= limit:

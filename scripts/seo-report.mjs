@@ -33,9 +33,39 @@ async function text(path) {
   return { status: res.status, body: await res.text() };
 }
 
+// Что видит тот, кто НЕ исполняет JavaScript. React при потоковой отдаче
+// оставляет в основном потоке <template>-дыру, а серверный контент дописывает
+// в конец документа в <div hidden id="S:n"> и показывает его скриптом. Для
+// Google и Яндекса это не проблема (они рендерят JS), для простого парсера —
+// пустая страница. Поэтому считаем дважды: поток и весь payload.
+function stripReveals(html) {
+  const noScripts = html.replace(/<script[\s\S]*?<\/script>/g, "");
+  let out = "";
+  let i = 0;
+  for (;;) {
+    const start = /<div hidden id="S:\d+">/.exec(noScripts.slice(i));
+    if (!start) return out + noScripts.slice(i);
+    out += noScripts.slice(i, i + start.index);
+    const tags = /<div\b|<\/div>/g;
+    tags.lastIndex = i + start.index + start[0].length;
+    let depth = 1;
+    let match;
+    while ((match = tags.exec(noScripts))) {
+      depth += match[0] === "</div>" ? -1 : 1;
+      if (depth === 0) break;
+    }
+    i = tags.lastIndex;
+  }
+}
+
+const count = (html, re) => (html.match(re) ?? []).length;
+
 async function audit(url) {
   const path = url.slice(BASE.length) || "/";
-  let row = { url: path, status: 0, bytes: 0, pins: 0, boards: 0, og: false, ogLocal: false, loader: false, abs: true };
+  let row = {
+    url: path, status: 0, bytes: 0, pins: 0, pinsAll: 0, boards: 0, boardsAll: 0,
+    og: false, ogLocal: false, loader: false, abs: true,
+  };
   try {
     const { status, body } = await text(path);
     // Next пишет и property=, и content= в одном теге, порядок атрибутов не
@@ -44,12 +74,15 @@ async function audit(url) {
       (m) => !/og:image:/.test(m[0]),
     )?.[0];
     const ogContent = /content="([^"]*)"/.exec(ogImage ?? "")?.[1] ?? "";
+    const flow = stripReveals(body);
     row = {
       url: path,
       status,
       bytes: Buffer.byteLength(body),
-      pins: (body.match(/href="\/pin\//g) ?? []).length,
-      boards: (body.match(/href="\/board\//g) ?? []).length,
+      pins: count(flow, /href="\/pin\//g),
+      pinsAll: count(body, /href="\/pin\//g),
+      boards: count(flow, /href="\/board\//g),
+      boardsAll: count(body, /href="\/board\//g),
       og: /^https?:\/\//.test(ogContent),
       // localhost в превью = мессенджер картинку не получит
       ogLocal: /localhost|127\.0\.0\.1/.test(ogContent),
@@ -60,8 +93,9 @@ async function audit(url) {
   } catch (err) {
     row.error = err.message.slice(0, 40);
   }
-  // «пустой» витриной считаем адрес, где нет ни ссылок на пины, ни ссылок на
-  // доски: содержимое приехало бы только после гидрации
+  // «пустой» витриной считаем адрес, где в основном потоке нет ни ссылок на
+  // пины, ни ссылок на доски: без JS такой краулер увидит пустоту, даже если
+  // контент приехал в скрытом блоке донашивателя.
   row.empty = row.pins === 0 && row.boards === 0;
   return row;
 }
@@ -69,18 +103,18 @@ async function audit(url) {
 function table(rows) {
   const pad = (s, n) => String(s).padEnd(n);
   console.log(
-    pad("адрес", 46), pad("код", 5), pad("КБ", 6), pad("пины", 6), pad("доски", 7),
-    pad("og:image", 11), "пустой HTML",
+    pad("адрес", 46), pad("код", 5), pad("КБ", 6), pad("пины поток", 11), pad("пины payload", 13),
+    pad("og:image", 11), "пустой поток",
   );
   for (const r of rows) {
     console.log(
       pad(r.url, 46),
       pad(r.error ? "ERR" : r.status, 5),
       pad((r.bytes / 1024).toFixed(1), 6),
-      pad(r.pins, 6),
-      pad(r.boards, 7),
+      pad(r.pins, 11),
+      pad(r.pinsAll, 13),
       pad(r.og ? (r.ogLocal ? "localhost" : "да") : "НЕТ", 11),
-      r.empty ? "ПУСТОЙ" : "",
+      r.empty ? "ПУСТО" : "",
       r.error ?? "",
     );
   }

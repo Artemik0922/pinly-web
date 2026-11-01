@@ -62,6 +62,9 @@ jobs:
         env:
           PINLY_DATA_DIR: ${{ runner.temp }}/pinly-data
           PINLY_JWT_SECRET: ci-secret-should-be-long-enough-0123456789
+          # Смоук создаёт доски и комментирует с одного адреса десятки раз за
+          # прогон: счётчик «не спамь» отбивал бы легитимные запросы теста.
+          PINLY_DISABLE_RATE_LIMIT: 1
         run: |
           mkdir -p "$PINLY_DATA_DIR"
           nohup python -m uvicorn backend.app:app --port 8000 > backend.log 2>&1 &

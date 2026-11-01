@@ -88,6 +88,14 @@ test("доска отдаёт превью для мессенджера и кн
   // пустая: превью-картинка в серверном HTML и кнопка шаринга на своей доске.
   const title = `Портфолио ${stamp}`;
 
+  // Картинку мок-пина отдаём локально: карточка сознательно исчезает при
+  // ошибке загрузки (битая картинка — это отсутствие картинки), а
+  // images.weserv.nl — чужая инфраструктура. Без стаба тест падает, когда у
+  // хостинга плохой день, и это не имеет отношения к доске.
+  await page.route("https://images.weserv.nl/**", (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: TINY_PNG }),
+  );
+
   await page.goto("/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Мастер Смоук");
   await page.getByLabel("Email", { exact: true }).fill(`share${stamp}@example.test`);
@@ -117,6 +125,11 @@ test("доска отдаёт превью для мессенджера и кн
   const html = await (await request.get(boardPath)).text();
   expect(html).toContain('property="og:image" content="http');
   expect(html).toContain(`property="og:title" content="${title}`);
+  // Содержимое доски едет с сервера: до серверного прохода в ответе не было ни
+  // одной работы — ни для краулера, ни для донашивателя. Google и Яндекс JS
+  // исполняют, а вот парсер, читающий payload целиком, раньше видел пустоту.
+  expect((html.match(/href="\/pin\//g) ?? []).length, "в ответе доски нет ни одной работы").toBeGreaterThan(0);
+  expect(html).toContain('"@type":"CollectionPage"');
 
   await page.goto(boardPath);
   await expect(page.getByRole("button", { name: "Поделиться" })).toBeVisible({ timeout: 40_000 });

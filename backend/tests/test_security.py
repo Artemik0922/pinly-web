@@ -114,3 +114,22 @@ def test_login_rate_limit(client, register):
     assert 401 in codes
     assert 429 in codes, codes
     ratelimit._attempts.clear()
+
+
+def test_rate_limit_can_be_switched_off_for_test_contour(client, register, monkeypatch):
+    """Под PINLY_DISABLE_RATE_LIMIT=1 живёт e2e-контур: смоук создаёт доски и
+    комментирует десятки раз с одного адреса. Провераем обе стороны, чтобы
+    флаг не выключил лимиты и в проде, и чтобы тесты не проверяли воздух."""
+    ratelimit._attempts.clear()
+    email = register().json()["user"]["email"]
+    monkeypatch.setenv("PINLY_DISABLE_RATE_LIMIT", "1")
+    codes = [
+        client.post("/api/auth/login", json={"email": email, "password": "не-тот-пароль"}).status_code
+        for _ in range(25)
+    ]
+    assert 429 not in codes, codes
+    # флаг снят — счётчик пуст (пока он был включён, попытки не записывались),
+    # дальше лимит работает как обычно
+    monkeypatch.delenv("PINLY_DISABLE_RATE_LIMIT")
+    assert client.post("/api/auth/login", json={"email": email, "password": "не-тот"}).status_code == 401
+    ratelimit._attempts.clear()

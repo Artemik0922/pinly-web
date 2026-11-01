@@ -38,7 +38,15 @@ function NotFound() {
   );
 }
 
-export function BoardView({ id }: { id: string }) {
+export function BoardView({
+  id,
+  initialForeign,
+}: {
+  id: string;
+  /** Публичный срез, приехавший с сервера: без него краулер и мессенджер
+   *  видели «Загрузка…», а гость допрашивал бэкенд повторно. */
+  initialForeign?: PublicBoard | null;
+}) {
   const { boards, ready, deleteBoard, renameBoard, toggleSecret } = useBoards();
   const { user } = useUser();
   const toast = useToast();
@@ -47,10 +55,14 @@ export function BoardView({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [title, setTitle] = useState("");
-  // Чужая доска: серверный ответ подтягиваем на клиенте, своего контекста
-  // досок для неё нет.
-  const [foreign, setForeign] = useState<PublicBoard | null>(null);
-  const [probed, setProbed] = useState(false);
+  // Чужая доска: серверная порция либо ответ /api/boards/{id}/public.
+  // Храним вместе с id — при переходе между досками ответ предыдущей
+  // показан быть не может.
+  const [loaded, setLoaded] = useState<{ id: string; board: PublicBoard | null } | null>(
+    initialForeign ? { id, board: initialForeign } : null,
+  );
+  const foreign = loaded?.id === id ? loaded.board : null;
+  const probed = loaded?.id === id;
 
   // «мастер приводит людей» проверяется здесь: сколько раз доску открыли
   // вне самого мастера и пришли ли по явной метке ?from=…
@@ -59,26 +71,28 @@ export function BoardView({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => {
-    if (!ready || board) return;
+    if (!ready || board || loaded?.id === id) return;
     const controller = new AbortController();
     let cancelled = false;
-    // переход между досками не должен оставить ответ предыдущей
     apiBoardPublic(id, controller.signal)
-      .then(setForeign)
-      .catch(() => {
-        if (!cancelled) setForeign(null);
+      .then((data) => {
+        if (!cancelled) setLoaded({ id, board: data });
       })
-      .finally(() => {
-        if (!cancelled) setProbed(true);
+      .catch(() => {
+        if (!cancelled) setLoaded({ id, board: null });
       });
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [ready, board, id]);
+  }, [ready, board, id, loaded]);
 
   if (board) {
-    const pins: Pin[] = board.pins;
+    // Список досок приходит из локального кэша провайдера и может отстать от
+    // сервера (сохранили пин в другой вкладке). Публичный срез, приехавший с
+    // страницы, всегда свежий — берём пины из него, пока свой список не
+    // переехал. Иначе «1 пин» в шапке и пустая сетка под ней.
+    const pins: Pin[] = board.pins.length > 0 ? board.pins : (foreign?.pins ?? []);
 
     const saveTitle = () => {
       const clean = title.trim();
