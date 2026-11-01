@@ -237,8 +237,74 @@ async function searchedPins(
   return { pins: mergeGroups([userHits, commonsHits, rest.pins]), nextCursor: rest.nextCursor };
 }
 
-/** Страница ленты. Курсор = номер страницы. */
+/** Страница ленты. Курсор = номер страницы.
+ *
+ *  Ответ живёт в памяти 15 секунд: SSR главной, prefetch Next и догрузка
+ *  курсором часто просят одну и ту же страницу в одну и ту же секунду, а за
+ *  каждым ответом — веер из трёх-четырёх внешних API.
+ */
 export async function getFeedPage(opts: {
+  category?: string;
+  q?: string;
+  cursor?: number;
+  session?: string | null;
+}): Promise<FeedPage> {
+  const key = feedKey(opts);
+
+  const fresh = pageCache.get(key);
+  if (fresh && fresh.at + PAGE_TTL_MS > Date.now()) return fresh.page;
+
+  // Тот же запрос уже собирается — дождаться дешевле, чем повторить веер
+  // заново.
+  const flight = pending.get(key);
+  if (flight) return flight;
+
+  const task = buildFeedPage(opts).then((page) => {
+    remember(key, page);
+    return page;
+  });
+  pending.set(key, task);
+  try {
+    return await task;
+  } finally {
+    // Ошибка не кэшируется: следующий запрос попробует снова, а не получает
+    // чужой провал все 15 секунд.
+    pending.delete(key);
+  }
+}
+
+// Ключ страницы: кто просит, категория, запрос и номер страницы. Хеш сессии
+// вместо cookie — персональная подборка не должна уезжать к другому
+// посетителю, а полный ключ в памяти хранить лишним секретом нельзя.
+function feedKey(opts: {
+  category?: string;
+  q?: string;
+  cursor?: number;
+  session?: string | null;
+}): string {
+  const who = opts.session
+    ? createHash("sha256").update(opts.session).digest("hex").slice(0, 16)
+    : "anon";
+  return `${who}|${opts.category ?? ""}|${opts.q?.trim().toLowerCase() ?? ""}|${opts.cursor ?? 0}`;
+}
+
+const PAGE_TTL_MS = 15_000;
+const PAGE_CACHE_MAX = 400;
+const pageCache = new Map<string, { at: number; page: FeedPage }>();
+const pending = new Map<string, Promise<FeedPage>>();
+
+// Живёт в памяти процесса: при нескольких воркерах кэш не синхронизируется, и
+// это нормально — он снимает дубли, а не гарантирует идентичную выдачу.
+function remember(key: string, page: FeedPage): void {
+  while (pageCache.size >= PAGE_CACHE_MAX) {
+    const oldest = pageCache.keys().next().value;
+    if (oldest === undefined) break;
+    pageCache.delete(oldest);
+  }
+  pageCache.set(key, { at: Date.now(), page });
+}
+
+async function buildFeedPage(opts: {
   category?: string;
   q?: string;
   cursor?: number;
