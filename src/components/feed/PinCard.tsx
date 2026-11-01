@@ -106,7 +106,7 @@ export const PinCard = memo(function PinCard({
         </div>
       </Link>
       {/* Затемнение — только там, где есть ховер. Градиент снизу, а не
-          плоская маска: картинка остаётся видно, а название читается.
+          плоская маска: картинка остаётся на виду, а название читается.
           На тач-устройствах оверлея нет вовсе: карточка — чистая картинка,
           сохранить и прочитать название можно на странице пина. Раньше
           на мобильном висели кнопка «Сохранить» и серая плашка названия —
@@ -114,9 +114,11 @@ export const PinCard = memo(function PinCard({
       <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100" />
 
       {/* Действия: только по ховеру или фокусу клавиатурой (иначе
-          «Сохранить» недостижим) */}
-      <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-150 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
-        <div className="absolute right-2 top-2" onClick={(e) => e.preventDefault()}>
+          «Сохранить» недостижим). Кликабельна сама кнопка, а не слой целиком:
+          pointer-events на всём слое превращал наведённую мышью карточку в
+          заглушку, и клик по картинке не открывал пин. */}
+      <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+        <div className="pointer-events-auto absolute right-2 top-2" onClick={(e) => e.preventDefault()}>
           <SaveControls pin={pin} />
         </div>
         <p className="absolute inset-x-3 bottom-3 truncate text-sm font-semibold text-white drop-shadow">

@@ -17,6 +17,13 @@ test("лента открывается и показывает пины", async
   await page.reload();
   await expect(page.locator('main a[href^="/pin/"]').first()).toBeVisible();
   expect(errors).toEqual([]);
+
+  // Клик по картинке обязан открывать пин: на десктопе слой действий карточки
+  // перехватывал указатель, и карточка переставала быть ссылкой. Playwright
+  // ждёт кликабельности, поэтому регрессия здесь упадёт сама, а не пройдёт
+  // молча.
+  await page.locator('main a[href^="/pin/"]').first().click();
+  await expect(page).toHaveURL(/\/pin\/.+/);
 });
 
 test("заставка показывается один раз за сессию и не запирает скролл", async ({ page }) => {
