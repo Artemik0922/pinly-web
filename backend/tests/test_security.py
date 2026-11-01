@@ -178,6 +178,20 @@ def test_login_rate_limit(client, register):
     ratelimit._attempts.clear()
 
 
+def test_like_rate_limit_caps_notification_spam(client, user):
+    """Каждый лайк пишет уведомление владельцу пина. Без потолка «лайк» — это
+    не вежливость, а канал доставки: им можно забросать уведомлениями кого
+    угодно. Проверяем, что серия упирается в 429, а не уходит в столбик."""
+    ratelimit._attempts.clear()
+    codes = [client.put("/api/likes/pin-spam", cookies=user["cookies"]).status_code for _ in range(305)]
+    assert codes[0] == 204
+    assert 429 in codes, "лимит лайков не сработал"
+    # и снятие лайка в том же бакете: переключение туда-сюда не должно
+    # обнулять счётчик
+    assert client.delete("/api/likes/pin-spam", cookies=user["cookies"]).status_code == 429
+    ratelimit._attempts.clear()
+
+
 def test_rate_limit_can_be_switched_off_for_test_contour(client, register, monkeypatch):
     """Под PINLY_DISABLE_RATE_LIMIT=1 живёт e2e-контур: смоук создаёт доски и
     комментирует десятки раз с одного адреса. Провераем обе стороны, чтобы

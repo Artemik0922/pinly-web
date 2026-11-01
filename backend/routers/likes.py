@@ -4,7 +4,7 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from .. import boards, likes, notifications
+from .. import boards, likes, notifications, ratelimit
 from ..deps import current_user, session_payload
 from ..schemas import MAX_PIN_ID_LEN
 
@@ -18,10 +18,14 @@ def likes_list(user: sqlite3.Row = Depends(current_user)) -> dict:
 
 @router.put("/api/likes/{pin_id}")
 def likes_put(
-    pin_id: str, user: sqlite3.Row = Depends(current_user)
+    pin_id: str, request: Request, user: sqlite3.Row = Depends(current_user)
 ) -> Response:
     if len(pin_id) > MAX_PIN_ID_LEN:
         raise HTTPException(400, "bad pin_id")
+    # 300 в минуту — не квота, а упор для скрипта: каждый лайк пишет
+    # уведомление владельцу пина, и без потолка «лайк» превращается в канал
+    # доставки до кого угодно. Реальному человеку такая скорость не нужна.
+    ratelimit.rate_limit(request, "like", limit=300, window_s=60.0)
     likes.add(user["id"], pin_id)
     # уведомление владельцу пина
     notifications.notify_like(user["id"], pin_id)
@@ -29,7 +33,10 @@ def likes_put(
 
 
 @router.delete("/api/likes/{pin_id}")
-def likes_delete(pin_id: str, user: sqlite3.Row = Depends(current_user)) -> Response:
+def likes_delete(
+    pin_id: str, request: Request, user: sqlite3.Row = Depends(current_user)
+) -> Response:
+    ratelimit.rate_limit(request, "like", limit=300, window_s=60.0)
     likes.remove(user["id"], pin_id)
     return Response(status_code=204)
 
