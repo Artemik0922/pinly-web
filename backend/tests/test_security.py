@@ -101,6 +101,68 @@ def test_board_pin_payload_is_validated(client, user):
     assert ok.status_code == 204
 
 
+def test_media_from_url_rejects_internal_addresses(client, user):
+    """Медиатека принимает «ссылку с любого хостинга» — значит проверка одна:
+    адрес не должен смотреть внутрь сети (петбэк, приватные подсети, метаданные
+    облака) и протокол обязан быть https."""
+    for url in (
+        "http://example.test/a.png",
+        "https://127.0.0.1/a.png",
+        "https://localhost:8000/api/boards",
+        "https://169.254.169.254/latest/meta-data",
+        "https://10.0.0.5/a.png",
+        "https://[::1]/a.png",
+    ):
+        response = client.post(
+            "/api/media/url",
+            json={"url": url, "title": "т", "width": 800, "height": 1200},
+            cookies=user["cookies"],
+        )
+        assert response.status_code == 400, (url, response.status_code, response.text)
+
+
+def test_media_redirect_target_checked_like_the_first_url(monkeypatch):
+    """302 — главный обход любой проверки хостов: наружу выглядит разрешённый
+    адрес, а ведёт на 127.0.0.1. Цель редиректа обязана пройти тот же фильтр."""
+    import asyncio
+
+    from fastapi import HTTPException
+
+    from backend import media as module
+
+    checked: list[str] = []
+
+    def fake_guard(url: str) -> str:
+        checked.append(url)
+        if not url.startswith("https://good.test"):
+            raise HTTPException(400, "address not allowed")
+        return url
+
+    class _Stream:
+        status_code = 302
+        headers = {"location": "http://127.0.0.1:8000/api/boards"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class _Client:
+        def stream(self, method: str, url: str):
+            return _Stream()
+
+    monkeypatch.setattr(module, "public_https", fake_guard)
+    try:
+        asyncio.run(module._fetch_capped(_Client(), "https://good.test/a.png"))
+    except HTTPException as err:
+        assert err.status_code == 400
+    else:
+        raise AssertionError("редирект внутрь сети прошёл")
+    # проверены оба адреса: заявленный клиентом и тот, куда повёл 302
+    assert len(checked) == 2, checked
+
+
 def test_login_rate_limit(client, register):
     """Брутфорс пароля должен упираться в лимит, а не перебирать бесконечно."""
     ratelimit._attempts.clear()  # счётчик в памяти: тесты не должны мешать друг другу

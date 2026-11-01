@@ -4,9 +4,12 @@
 # наружу в том и другом случае отдаётся одно поле url, а флаг external говорит
 # клиенту, есть ли у нас файл (и его ли удалять).
 
+import ipaddress
 import os
+import socket
 import sqlite3
 import time
+import urllib.parse
 import uuid
 
 import httpx
@@ -50,25 +53,83 @@ def add_file(user_id: str, content: bytes, title: str, width: int, height: int, 
     return insert(user_id, title, width, height, filename)
 
 
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+# Тот же потолок, что у загрузки файлом в интерфейсе (10 МБ): ответ хостинга
+# может быть любого размера, а читаем мы его в память одного воркера.
+MAX_URL_BYTES = 10 * 1024 * 1024
+MAX_REDIRECTS = 3
+
+
+def public_https(url: str) -> str:
+    """https + хост, который смотрит в публичный адрес.
+
+    Медиатека сознательно принимает ЛЮБОЙ хостинг (в этом её смысл для
+    пользователя), поэтому вместо allowlist проверяем, что адрес не внутренний:
+    127.0.0.0/8, 10/8, 172.16/12, 192.168/16, link-local 169.254 (в нём же
+    метаданные облаков) и IPv6-аналоги. Проверяем все ответы DNS, а не первый.
+
+    Гонку «проверили — потом переподключилось» (DNS rebinding) это не закрывает
+    полностью: для этого нужно коннектиться к уже проверенному IP. На практике
+    сервер живёт в одной сети с базой и без облачных метаданных, поэтому шаг
+    закрыт проверкой каждого редиректа — он и есть основной путь внутрь.
+    """
+    if not url.startswith("https://"):
+        raise HTTPException(400, "url must be https")
+    host = urllib.parse.urlsplit(url).hostname or ""
+    if not host:
+        raise HTTPException(400, "bad url")
+    try:
+        infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        raise HTTPException(400, "host not resolved")
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            raise HTTPException(400, "bad address")
+        if not ip.is_global:
+            raise HTTPException(400, "address not allowed")
+    return url
+
+
+async def _fetch_capped(client: httpx.AsyncClient, url: str) -> bytes:
+    """Скачать с потоковым чтением и потолком в байтах."""
+    target = public_https(url)
+    for _ in range(MAX_REDIRECTS + 1):
+        async with client.stream("GET", target) as res:
+            if res.status_code in REDIRECT_STATUSES:
+                location = res.headers.get("location")
+                if not location:
+                    raise HTTPException(502, "redirect without location")
+                # редирект проверяется наравне с первым адресом: иначе один
+                # 302 уводит на 127.0.0.1:8000 и allowlist не нужен
+                target = public_https(urllib.parse.urljoin(target, location))
+                continue
+            if res.status_code >= 400:
+                raise HTTPException(502, f"upstream {res.status_code}")
+            content = bytearray()
+            async for chunk in res.aiter_bytes(64 * 1024):
+                content += chunk
+                if len(content) > MAX_URL_BYTES:
+                    raise HTTPException(413, "file too large")
+            return bytes(content)
+    raise HTTPException(400, "too many redirects")
+
+
 async def add_from_url(user_id: str, url: str, title: str, width: int, height: int) -> dict:
     """Забрать картинку по ссылке с любого хостинга в своё хранилище."""
     url = url.strip()
-    if not url.startswith("https://"):
-        raise HTTPException(400, "url must be https")
     # Wikimedia требует описательный UA с контактом (их robot policy):
     # маскировка под браузер получает 403, честный бот — 200
     async with httpx.AsyncClient(
         timeout=URL_FETCH_TIMEOUT_S,
-        follow_redirects=True,
+        follow_redirects=False,  # сопровождаем сами и проверяем каждый хоп
         headers={"User-Agent": FETCHER_USER_AGENT},
     ) as client:
         try:
-            res = await client.get(url)
+            content = await _fetch_capped(client, url)
         except httpx.HTTPError:
             raise HTTPException(502, "could not fetch url")
-    if res.status_code >= 400:
-        raise HTTPException(502, f"upstream {res.status_code}")
-    content = res.content or b""
     if not content:
         raise HTTPException(400, "empty file")
     # тип проверяем по байтам: Content-Type хостинга врать не умеет только в наших мечтах
