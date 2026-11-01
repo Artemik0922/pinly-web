@@ -299,6 +299,28 @@ const sendPhoto = (
     ...(headers ? { headers } : null),
   });
 
+test("личные разделы закрыты от индекса — и в meta, и в robots.txt", async ({ request }) => {
+  // Страницы-«тонкие» разделы без сессии показывают «Войдите», а с сессией
+  // светили бы чужие данные. Инвентарь здесь, чтобы новый личный раздел не
+  // забыли закрыть через полгода.
+  const privatePaths = ["/media", "/notifications", "/messages", "/subscriptions", "/boards", "/search"];
+  for (const path of privatePaths) {
+    const res = await request.get(path);
+    expect(res.ok(), path).toBeTruthy();
+    expect(await res.text(), path).toContain("noindex");
+  }
+  const robots = await request.get("/robots.txt").then((r) => r.text());
+  for (const path of privatePaths) expect(robots, path).toContain(`Disallow: ${path}`);
+});
+
+test("лента не отдаёт моки поисковику", async ({ request }) => {
+  // Мок-лента — страховка на отказ внешних API: picsum-случайность с
+  // выдуманными авторами и нарисованными лайками. Обещать её индексу нельзя.
+  const map = await request.get("/sitemap.xml").then((r) => r.text());
+  expect(map).toContain("/category/");
+  expect(map).not.toContain("/pin/pin-");
+});
+
 test("режим «по фото» открывается из поиска и держит форму", async ({ page }) => {
   await page.goto("/search?by=image");
   await expect(page.getByRole("heading", { level: 1, name: "Поиск по фото" })).toBeVisible();

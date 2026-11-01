@@ -90,12 +90,19 @@ export function InfiniteFeed({
   }, [cursor, loadMore, pins.length, cap]);
 
   const retry = () => {
-    if (cursor === null) return;
+    // При пустой первой порции курсор null («страниц больше нет»), но начинать
+    // надо с нуля — иначе «Повторить» была бы мёртвой кнопкой.
+    const cur = cursor ?? 0;
     setLoading(true);
-    loadMore(cursor);
+    loadMore(cur);
   };
 
   const reachedCap = pins.length >= cap && cursor !== null;
+  // Пустая лента без ошибки и без загрузки, и курсор говорит «страниц больше
+  // нет» = источник отдал ноль пинов. Без этой ветки человек видел белый экран
+  // и ни одного объяснения. Условие по cursor нужно, чтобы не мигать подсказкой
+  // на пустой серверной порции, из которой лента ещё догрузится.
+  const empty = !loading && !error && pins.length === 0 && cursor === null;
 
   return (
     <div>
@@ -115,6 +122,21 @@ export function InfiniteFeed({
             type="button"
             onClick={retry}
             className="mt-3 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
+          >
+            Повторить
+          </button>
+        </div>
+      )}
+      {empty && (
+        <div className="py-16 text-center">
+          <p className="text-muted">
+            Лента не заполнилась — источник картинок ничего не вернёт. Попробуйте
+            ещё раз или зайдите позже.
+          </p>
+          <button
+            type="button"
+            onClick={retry}
+            className="mt-4 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
           >
             Повторить
           </button>

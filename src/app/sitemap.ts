@@ -8,7 +8,6 @@
 
 import { connection } from "next/server";
 import type { MetadataRoute } from "next";
-import { PINS } from "@/data/mock-pins";
 import { CATEGORY_PAGES } from "@/lib/categories";
 import { SITE_URL } from "@/lib/site";
 
@@ -41,7 +40,9 @@ async function dbUrls(): Promise<SeoUrl[]> {
   } catch {
     urls = []; // бэкенд молчит — карта остаётся статической, но не падает
   }
-  memory = { at: Date.now(), urls };
+  // Пустой ответ не кэшируем: одна секунда таймаута вычёркивала бы доски и
+  // профили из публичной карты на десять минут.
+  if (urls.length > 0) memory = { at: Date.now(), urls };
   return urls;
 }
 
@@ -62,9 +63,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry("/", 1),
     // чистые адреса категорий; старый ?category= закрыт от обхода в robots.ts
     ...CATEGORY_PAGES.map((page) => entry(`/category/${page.slug}`, 0.7)),
-    // пины и доски из базы: без них карта описывает витрину, а не сайт
+    // пины, доски и профили из базы. Моки ленты в карту не идут: это picsum-
+    // случайность с выдуманными авторами и нарисованными лайками, и обещать
+    // её поисковику — значит просить индексировать бутафорию.
     ...dynamic.map((u) => entry(u.path, priorityOf(u.path), u.lastmod)),
-    // моки ленты — тот же контент, что отдаёт гость без бэкенда
-    ...PINS.slice(0, 200).map((p) => entry(`/pin/${p.id}`, 0.3)),
   ];
 }
