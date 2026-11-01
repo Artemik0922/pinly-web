@@ -16,6 +16,7 @@
     "warm": "node scripts/warm.mjs",
     "index": "node scripts/index-pins.mjs",
     "probe:embeddings": "node scripts/probe-embeddings.mjs",
+    "seo:report": "node scripts/seo-report.mjs",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test:api": "python -m pytest backend/tests -q",
