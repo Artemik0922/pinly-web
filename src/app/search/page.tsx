@@ -6,18 +6,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import type { Pin } from "@/lib/pin";
-import { searchPins } from "@/lib/api/feed";
-import { MasonryGrid } from "@/components/ui/MasonryGrid";
+import { Suspense, useState } from "react";
+import { InfiniteFeed } from "@/components/feed/InfiniteFeed";
 import { CategoryChips } from "@/components/ui/CategoryChips";
 import { IconQuestion, IconSearch } from "@/components/ui/Icons";
 import { PhotoDropZone, PhotoResults } from "@/components/search/PhotoPanel";
 import { PhotoSourceMenu } from "@/components/search/PhotoSourceMenu";
 import { SearchModeTabs } from "@/components/search/SearchModeTabs";
 import { usePhotoSearch } from "@/components/search/usePhotoSearch";
-
-type Result = { q: string; pins: Pin[] };
 
 // Ширина панели: на 1920 px строка поиска во всю ширину превращается в бегущую
 // полосу, где поле и кнопка не видны одновременно.
@@ -75,34 +71,9 @@ function SearchResults() {
   // источников разворачивают сразу, лишний тап не нужен.
   const pick = params.get("pick") === "1";
 
-  const [result, setResult] = useState<Result | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
   const photo = usePhotoSearch(byPhoto);
-
-  useEffect(() => {
-    if (!q.trim()) return;
-    const controller = new AbortController();
-    let settled = false;
-    searchPins(q, controller.signal)
-      .then((pins) => {
-        if (settled) return;
-        setResult({ q, pins });
-        setError(null);
-      })
-      .catch(() => {
-        if (!settled) setError("Поиск не выполнился — сервер ленты недоступен.");
-      });
-    return () => {
-      settled = true;
-      controller.abort();
-    };
-  }, [q, attempt]);
-
-  // Ответ ещё не по текущему запросу — значит ищем. Пустой запрос не ищем
-  // никогда: «Ищем…» без запроса выглядит как зависший сайт.
-  const loading = q.trim() !== "" && !error && result?.q !== q;
-  const pins = result?.q === q ? result.pins : [];
+  // Счётчик отдаёт InfiniteFeed: страницы выдачи он знает, а заголовок — нет.
+  const [shown, setShown] = useState(0);
 
   return (
     <>
@@ -110,7 +81,7 @@ function SearchResults() {
       <div className={PANEL}>
         <h1 className="pt-4 text-sm font-semibold text-muted">
           {byPhoto ? "Поиск по фото" : q ? `Поиск: «${q}»` : "Что ищем?"}
-          {!byPhoto && pins.length > 0 && <span className="ml-2">{pins.length}</span>}
+          {!byPhoto && shown > 0 && <span className="ml-2">{shown}</span>}
         </h1>
 
         {/* Всё управление в одну строку: поле, режим, источник фото. */}
@@ -132,55 +103,37 @@ function SearchResults() {
             <PhotoDropZone state={photo} />
             {!photo.busy && <PhotoResults pins={photo.pins} />}
           </>
+        ) : !q.trim() ? (
+          <p className="mt-3 text-sm text-muted">
+            Печатайте запрос — ищем по названию, описанию, тегам и категории.
+          </p>
         ) : (
-          <>
-            {!q && (
-              <p className="mt-3 text-sm text-muted">
-                Печатайте запрос — ищем по названию, описанию, тегам и категории.
-              </p>
-            )}
-            {loading && <p className="mt-3 text-sm text-muted">Ищем…</p>}
-
-            {error && (
-              <div className="mt-3 text-sm">
-                <p className="text-danger" role="alert">{error}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setResult(null);
-                    setAttempt((n) => n + 1);
-                  }}
-                  className="mt-2 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
-                >
-                  Повторить
-                </button>
-              </div>
-            )}
-
-            {!loading && !error && pins.length > 0 && (
-              <div className="mt-4">
-                <MasonryGrid pins={pins} />
-              </div>
-            )}
-
-            {!loading && !error && q && pins.length === 0 && (
-              <div className="py-10 text-center">
-                <p className="grid place-items-center text-muted">
-                  <IconQuestion size={32} />
-                </p>
-                <p className="mt-2 text-muted">
-                  По запросу «{q}» ничего не нашлось. Попробуйте категорию или тег.
-                </p>
-                <Link
-                  href="/"
-                  className="mt-4 inline-block rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
-                >
-                  Вернуться в ленту
-                </Link>
-              </div>
-            )}
-          </>
+          // key по запросу: новая выдача обязана начаться с первой страницы,
+          // а не догружаться к прошлому поиску. Курсор, обрыв запроса при
+          // уходе и дубли на стыке страниц умеет InfiniteFeed.
+          <div className="mt-4">
+            <InfiniteFeed
+              key={q}
+              q={q}
+              onCount={setShown}
+              empty={
+                <>
+                  <p className="grid place-items-center text-muted">
+                    <IconQuestion size={32} />
+                  </p>
+                  <p className="mt-2 text-muted">
+                    По запросу «{q}» ничего не нашлось. Попробуйте категорию или тег.
+                  </p>
+                  <Link
+                    href="/"
+                    className="mt-4 inline-block rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background hover:opacity-90"
+                  >
+                    Вернуться в ленту
+                  </Link>
+                </>
+              }
+            />
+          </div>
         )}
       </div>
     </>

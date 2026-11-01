@@ -62,7 +62,7 @@ Python-бэкенде на SQLite, оптимизацией картинок з�
 | **Доски** | создание, переименование, удаление, коллажи-превью, секретные доски, публичная ссылка, по которой доску видят чужие | [`src/components/board/BoardView.tsx`](src/components/board/BoardView.tsx) |
 | **Аккаунты** | регистрация, сессия httpOnly-cookie, аватар, удаление аккаунта с каскадом по всем данным | [`backend/accounts.py`](backend/accounts.py) |
 | **Соцблок** | подписки, публичные профили и доски, комментарии, уведомления о лайке, комментарии и подписке | [`backend/routers/social.py`](backend/routers/social.py), [`backend/notifications.py`](backend/notifications.py) |
-| **Поиск** | по названию, описанию, тегам и категории; с ключом — ещё и смысловой, по векторам. Плюс режим «по фото»: картинка → похожие пины | [`src/app/search/page.tsx`](src/app/search/page.tsx), [`src/components/search/PhotoSearch.tsx`](src/components/search/PhotoSearch.tsx) |
+| **Поиск** | по названию, описанию, тегам и категории; с ключом — ещё и смысловой, по векторам. Выдача листается курсором, как лента. Плюс режим «по фото»: картинка → похожие пины | [`src/app/search/page.tsx`](src/app/search/page.tsx), [`src/components/search/PhotoPanel.tsx`](src/components/search/PhotoPanel.tsx), [`src/components/search/PhotoSourceMenu.tsx`](src/components/search/PhotoSourceMenu.tsx) |
 | **Мелочи** | светлая и тёмная тема до первой отрисовки, тосты, подтверждение удаления, стартовый экран с роем мышей | [`src/app/layout.tsx`](src/app/layout.tsx) |
 
 ## 🖼 Экраны

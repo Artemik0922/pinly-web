@@ -82,6 +82,56 @@ test("поиск отвечает заголовком и результатам
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 });
 
+test("выдача поиска листается курсором, а не обрывается первой страницей", async ({ page }) => {
+  // Курсор у /api/feed есть и для q, но клиент его выбрасывал: «показано 20» и
+  // тупик. Выдачу подменяем здесь же, в браузере, — проверка не должна
+  // зависеть от того, что сегодня вернёт Openverse.
+  const card = (n: number) => ({
+    id: `srch${stamp}-p${n}`,
+    title: `Пин ${n}`,
+    description: "",
+    category: "Интерьер",
+    tags: [],
+    author: "Источник",
+    width: 800,
+    height: 600,
+    seed: `srch${stamp}${n}`,
+    likes: 0,
+  });
+  const cursors: string[] = [];
+
+  await page.route("https://images.weserv.nl/**", (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: TINY_PNG }),
+  );
+  await page.route("**/api/feed**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/feed") return route.continue();
+    const cursor = url.searchParams.get("cursor") ?? "0";
+    cursors.push(cursor);
+    const first = cursor === "0";
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        pins: first ? [card(1), card(2)] : [card(3), card(4)],
+        nextCursor: first ? 1 : null,
+      }),
+    });
+  });
+
+  const cards = page.locator(`main a[href^="/pin/srch${stamp}"]`);
+  await page.goto(`/search?q=${encodeURIComponent("кухня")}`);
+  // Двух карточек на экран мало, сентинел остаётся видимым — вторая страница
+  // приходит сама. Поэтому ждём финал, а не промежуток между запросами.
+  await expect(cards).toHaveCount(4, { timeout: 20_000 });
+  expect(cursors, "страницы листались не по одному курсору").toEqual(["0", "1"]);
+
+  const hrefs = await cards.evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+  expect(new Set(hrefs).size, "на стыке страниц остались дубли").toBe(hrefs.length);
+  // счётчик в заголовке = сколько карточек показано, а не «всего в мире»
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("4");
+  await expect(page.getByText("Это всё")).toBeVisible();
+});
+
 test("доска отдаёт превью для мессенджера и кнопку «Поделиться»", async ({ page, request, context }) => {
   // Мастер показывает работы клиенту ссылкой — проверка, что ссылка не
   // пустая: превью-картинка в серверном HTML и кнопка шаринга на своей доске.
@@ -354,9 +404,13 @@ test("заголовок пина не разрывает блок структ�
   const uid = (await (await page.request.get("/api/auth/me")).json()).user.id as string;
 
   const profileHtml = await (await request.get(`/profile/${uid}`)).text();
-  const blocks = profileHtml.match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g) ?? [];
-  expect(blocks, "в профиле не оказалось блока структурированных данных").toHaveLength(1);
-  const ldBody = blocks[0].replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "");
+  // Захват внутри <script>…</script>: если экранирование сломано, блок
+  // обрывается на первом же закрывающем теге и подстановки не дождаться.
+  const ldBody =
+    profileHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1] ?? "";
+  expect(ldBody, "в профиле не оказалось блока структурированных данных").toContain(
+    '"@type":"ProfilePage"',
+  );
   expect(ldBody).toContain("\\u003c/script\\u003e");
   expect(ldBody).not.toContain("</script>");
   expect(profileHtml).not.toContain('<b class="xss2">');

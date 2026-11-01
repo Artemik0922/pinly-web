@@ -10,7 +10,7 @@
 // • AbortController — смена категории или уход со страницы обрывают запрос,
 // а не оставляют его догружаться в никуда.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Pin } from "@/lib/pin";
 import { fetchFeedPage } from "@/lib/api/feed";
 import { MasonryGrid } from "@/components/ui/MasonryGrid";
@@ -19,12 +19,23 @@ const MAX_VISIBLE = 300;
 
 export function InfiniteFeed({
   category,
+  q,
   initialPins,
   initialCursor,
+  empty,
+  onCount,
 }: {
   category?: string;
+  /** Поисковый запрос: тот же /api/feed и тот же курсор, только выдача по q. */
+  q?: string;
   initialPins?: Pin[];
   initialCursor?: number | null;
+  /** Чем заменить «ничего нет», когда у выдачи свой текст. У поиска это
+   *  «по запросу … ничего не нашлось», а не «источник молчит». */
+  empty?: ReactNode;
+  /** Сколько карточек сейчас показано. Состояние страниц живёт здесь, а
+   *  счётчик — в заголовке родителя, поэтому он просит его вернуть. */
+  onCount?: (shown: number) => void;
 }) {
   const hasInitial = initialPins !== undefined;
   const [pins, setPins] = useState<Pin[]>(initialPins ?? []);
@@ -43,7 +54,7 @@ export function InfiniteFeed({
       controller.current?.abort();
       const signal = (controller.current = new AbortController()).signal;
       try {
-        const page = await fetchFeedPage({ category, cursor: cur, signal });
+        const page = await fetchFeedPage({ category, q, cursor: cur, signal });
         setPins((prev) => {
           // Разные запросы Openverse могут вернуть одну картинку —
           // дубли на стыке страниц убираем.
@@ -62,7 +73,7 @@ export function InfiniteFeed({
         busy.current = false;
       }
     },
-    [category],
+    [category, q],
   );
 
   useEffect(
@@ -71,6 +82,12 @@ export function InfiniteFeed({
     },
     [],
   );
+
+  // Счётчик для заголовка родителя: stable setState из useState, поэтому
+  // эффект не заводит цикл.
+  useEffect(() => {
+    onCount?.(pins.length);
+  }, [onCount, pins.length]);
 
   // Начальная загрузка — тот же наблюдатель: без серверной порции сентинел
   // виден сразу, поэтому первая страница приходит в первом же проходе.
@@ -98,23 +115,21 @@ export function InfiniteFeed({
   };
 
   const reachedCap = pins.length >= cap && cursor !== null;
-  // Пустая лента без ошибки и без загрузки, и курсор говорит «страниц больше
+  // Пустая выдача без ошибки и без загрузки, и курсор говорит «страниц больше
   // нет» = источник отдал ноль пинов. Без этой ветки человек видел белый экран
   // и ни одного объяснения. Условие по cursor нужно, чтобы не мигать подсказкой
   // на пустой серверной порции, из которой лента ещё догрузится.
-  const empty = !loading && !error && pins.length === 0 && cursor === null;
+  const noResults = !loading && !error && pins.length === 0 && cursor === null;
 
   return (
     <div>
-      {/* Без скелетонов: пока пинов нет (первая загрузка), — пустое место,
+      {/* Без скелетонов: пока пинов нет (первая загрузка), — строка «Загрузка…»,
           карточки появляются только с готовыми картинками */}
       {pins.length > 0 && (
         <MasonryGrid pins={reachedCap ? pins.slice(0, cap) : pins} />
       )}
       <div ref={sentinel} className="h-2" />
-      {loading && pins.length > 0 && (
-        <p className="py-6 text-center text-sm text-muted">Загрузка…</p>
-      )}
+      {loading && <p className="py-6 text-center text-sm text-muted">Загрузка…</p>}
       {error && (
         <div className="py-6 text-center text-sm">
           <p className="text-danger" role="alert">{error}</p>
@@ -127,19 +142,23 @@ export function InfiniteFeed({
           </button>
         </div>
       )}
-      {empty && (
+      {noResults && (
         <div className="py-16 text-center">
-          <p className="text-muted">
-            Лента не заполнилась — источник картинок ничего не вернёт. Попробуйте
-            ещё раз или зайдите позже.
-          </p>
-          <button
-            type="button"
-            onClick={retry}
-            className="mt-4 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
-          >
-            Повторить
-          </button>
+          {empty ?? (
+            <>
+              <p className="text-muted">
+                Лента не заполнилась — источник картинок ничего не вернёт. Попробуйте
+                ещё раз или зайдите позже.
+              </p>
+              <button
+                type="button"
+                onClick={retry}
+                className="mt-4 rounded-full bg-foreground px-5 py-2 font-semibold text-background hover:opacity-90"
+              >
+                Повторить
+              </button>
+            </>
+          )}
         </div>
       )}
       {reachedCap && !loading && (
