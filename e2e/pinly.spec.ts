@@ -19,6 +19,21 @@ test("лента открывается и показывает пины", async
   expect(errors).toEqual([]);
 });
 
+test("заставка показывается один раз за сессию и не запирает скролл", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator('main a[href^="/pin/"]').first()).toBeVisible();
+  // в первый заход экран был (любая из фаз — on уже мог смениться hidden)
+  expect(["on", "burst", "hidden"]).toContain(
+    await page.evaluate(() => document.documentElement.dataset.splash),
+  );
+
+  await page.reload();
+  // второй заход в той же сессии: ни экрана, ни роя мышей, сразу страница
+  expect(await page.evaluate(() => document.documentElement.dataset.splash)).toBe("skipped");
+  await expect(page.locator('main a[href^="/pin/"]').first()).toBeVisible({ timeout: 4000 });
+  expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe("hidden");
+});
+
 test("регистрация, секретная доска и комментарий", async ({ page }) => {
   // 1. новый аккаунт
   await page.goto("/signup");

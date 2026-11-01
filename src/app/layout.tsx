@@ -66,15 +66,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
         {/* Стартовый экран, две фазы: когда документ загружен и шрифты готовы
-            (но не раньше 3 с) — "burst", из заставки вылетает рой летучих
-            мышей и она
-            ещё держится 1.8 с; затем "hidden" — заставка тает. Максимум 5 с
-            до "burst" — медленная сеть не запирает сайт. Если скрипт упал,
-            data-splash остаётся неустановленным и экран не показывается
-            вовсе (см. .splash в globals.css). */}
+            (но не раньше 600 мс, чтобы экран не мигал) — "burst", из заставки
+            вылетает рой летучих мышей и она ещё держится 1.8 с; затем "hidden"
+            — заставка тает. Максимум 5 с до "burst" — медленная сеть не
+            запирает сайт. Внутри одной сессии заставка показывается один раз:
+            флаг ставится в момент решения показать, поэтому перезагрузка прямо
+            во время анимации её не возвращает (при втором заходе — "skipped",
+            ни экрана, ни роя). Если скрипт упал, data-splash остаётся
+            неустановленным и экран не показывается вовсе (см. .splash в
+            globals.css). */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var d=document.documentElement;d.dataset.splash="on";var t0=Date.now(),done=false;function hide(){if(done)return;done=true;var wait=Math.max(0,3000-(Date.now()-t0));setTimeout(function(){d.dataset.splash="burst";setTimeout(function(){d.dataset.splash="hidden";},1800);},wait);}var pending=2;function step(){if(--pending===0)hide();}if(document.readyState==="complete")step();else addEventListener("load",step,{once:true});if(document.fonts&&document.fonts.ready)document.fonts.ready.then(step);else step();setTimeout(hide,5000);}catch(e){try{document.documentElement.dataset.splash="hidden";}catch(_){}}})();`,
+            __html: `(function(){try{var d=document.documentElement;var seen=false;try{seen=sessionStorage.getItem("pinly:splash:seen")==="1";}catch(e){}if(seen){d.dataset.splash="skipped";return;}d.dataset.splash="on";try{sessionStorage.setItem("pinly:splash:seen","1");}catch(e){}var t0=Date.now(),done=false;function hide(){if(done)return;done=true;var wait=Math.max(0,600-(Date.now()-t0));setTimeout(function(){d.dataset.splash="burst";setTimeout(function(){d.dataset.splash="hidden";},1800);},wait);}var pending=2;function step(){if(--pending===0)hide();}if(document.readyState==="complete")step();else addEventListener("load",step,{once:true});if(document.fonts&&document.fonts.ready)document.fonts.ready.then(step);else step();setTimeout(hide,5000);}catch(e){try{document.documentElement.dataset.splash="hidden";}catch(_){}}})();`,
           }}
         />
       </head>

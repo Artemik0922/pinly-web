@@ -154,9 +154,9 @@ html[data-splash="burst"] .splash {
   transition: opacity 0.35s ease;
 }
 
-/* Пока заставка видна, страницу под ней не прокручиваем */
-html[data-splash="on"] body,
-html[data-splash="burst"] body {
+/* Прокручиваем страницу уже в фазе роя: под разлетающимися мышами она видна,
+   а запирать скролл имеет смысл только пока экран непрозрачен */
+html[data-splash="on"] body {
   overflow: hidden;
 }
 
