@@ -136,10 +136,18 @@ def search_user_pins(q: str, limit: int = 4) -> list[dict]:
         return cards(conn, rows)
 
 
-def pins_of_user(conn: sqlite3.Connection, user_id: str) -> list[sqlite3.Row]:
-    return conn.execute(
-        "select * from pins where user_id = ? order by created_at desc", (user_id,)
-    ).fetchall()
+def pins_of_user(conn: sqlite3.Connection, user_id: str, limit: int | None = None) -> list[sqlite3.Row]:
+    """Все пины автора (так их вычитывает стирание аккаунта) либо первые `limit`.
+
+    Потолок нужен серверному рендеру профиля: без него страница мастера с
+    тысячей загрузок отдаёт тысячу карточек в HTML.
+    """
+    query = "select * from pins where user_id = ? order by created_at desc"
+    args: list = [user_id]
+    if limit is not None:
+        query += " limit ?"
+        args.append(limit)
+    return conn.execute(query, args).fetchall()
 
 
 def clean_tags(raw: str) -> list[str]:

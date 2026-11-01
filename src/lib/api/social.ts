@@ -24,6 +24,10 @@ export type Comment = {
   author: { id: string; name: string; avatarUrl: string | null };
 };
 
+/** Витрина профиля целиком: карточка, открытые доски, первая порция пинов.
+ *  Один и тот же набор собирают серверный рендер и клиентская дозагрузка. */
+export type ProfileData = { profile: PublicUser; pins: Pin[]; boards: PublicBoard[] };
+
 /** Профиль по id; null — пользователя нет (404). */
 export async function apiPublicUser(
   userId: string,

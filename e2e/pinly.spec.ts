@@ -157,6 +157,56 @@ test("доска отдаёт превью для мессенджера и кн
   await expect(page.locator("main").getByText(/Отправьте этот адрес заказчику/)).toBeVisible();
 });
 
+test("профиль мастера приезжает витриной, а не «Загрузкой…»", async ({ page, request }) => {
+  // Адрес /profile/<id> уже лежит в sitemap, но страница собиралась целиком
+  // в браузере: поисковик индексировал пустоту ровно там, где мастер показывает
+  // работы. Проверка анонимным запросом — cookies тестового браузера здесь
+  // были бы самообманом, краулер носит пустые руки.
+  const name = `Мастер Витрина ${stamp}`;
+  const title = `Портфолио витрины ${stamp}`;
+
+  await page.goto("/signup");
+  await page.getByLabel("Имя", { exact: true }).fill(name);
+  await page.getByLabel("Email", { exact: true }).fill(`profile${stamp}@example.test`);
+  await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await expect(page).toHaveURL("/boards?welcome=1");
+
+  await page.getByPlaceholder("Название новой доски…").fill(title);
+  await page.getByRole("button", { name: "Создать", exact: true }).click();
+  await expect(page.locator('main a[href^="/board/"]').filter({ hasText: title })).toBeVisible();
+
+  // Своя работа — чтобы у профиля было что показать и в og:image, и в ленте.
+  const uploaded = await page.request.post("/api/pins", {
+    multipart: {
+      file: { name: "work.png", mimeType: "image/png", buffer: TINY_PNG },
+      title: `Работа ${stamp}`,
+    },
+  });
+  expect(uploaded.ok()).toBe(true);
+
+  const uid = (await (await page.request.get("/api/auth/me")).json()).user.id as string;
+
+  const html = await (await request.get(`/profile/${uid}`)).text();
+  expect(html, "в <title> нет имени мастера").toMatch(/<title>[^<]*Мастер Витрина/);
+  expect(html).toMatch(/<h1[^>]*>[^<]*Мастер Витрина/);
+  expect((html.match(/href="\/board\//g) ?? []).length, "в HTML профиля нет ни одной доски").toBeGreaterThan(0);
+  expect(html).toContain(title);
+  expect(html).toContain('"@type":"ProfilePage"');
+  // Ссылка на профиль тоже уходит в чат — без превью она серая полоска текста.
+  expect((html.match(/href="\/pin\/up-/g) ?? []).length, "в HTML профиля нет ни одной работы").toBeGreaterThan(0);
+  expect(html).toContain('property="og:image" content="http');
+
+  // Свой профиль остаётся приватным взглядом: витрина с кнопкой «Подписаться»
+  // вместо редактора была бы прямым обманом.
+  await page.goto(`/profile/${uid}`);
+  await expect(page.getByRole("button", { name: "Редактировать профиль" })).toBeVisible({
+    timeout: 40_000,
+  });
+  await expect(page.getByRole("button", { name: /^Подписаться/ })).toHaveCount(0);
+});
+
 test("браузер считает визит и приход на доску по метке источника", async ({ page }) => {
   // Рекламная модель живёт на показах: если трекер не стреляет из браузера,
   // цифры в сводке означают только curl-проверки, а не поведение людей.
@@ -258,7 +308,7 @@ test("мастер видит цифры своей доски", async ({ page, 
   await anon.close();
 });
 
-test("заголовок пина не разрывает блок структурированных данных", async ({ page }) => {
+test("заголовок пина не разрывает блок структурированных данных", async ({ page, request }) => {
   // Payload в названии: страница пина отдаётся без авторизации, а JSON-LD
   // вставляется как текст <script>. Если его не экранировать, закрывающий тег
   // из названия обрывает блок, и дальше браузер исполняет уже разметку
@@ -294,6 +344,22 @@ test("заголовок пина не разрывает блок структ�
   expect(ldText).not.toContain("</script>");
   // и при этом заголовок виден читателю целиком — escape не портит содержимое
   await expect(page.getByRole("heading", { level: 1 })).toContainText("XSS");
+
+  // Имя автора — тот же вход, что и заголовок пина, и оно тоже уходит в
+  // JSON-LD серверного профиля (ProfilePage/Person). b.xss2: проверка, что
+  // из payload не родился живой узел, а не просто «символы не потерялись».
+  const evilName = 'Имя </script><b class="xss2">BB</b>';
+  const renamed = await page.request.patch("/api/auth/me", { data: { display_name: evilName } });
+  expect(renamed.ok()).toBe(true);
+  const uid = (await (await page.request.get("/api/auth/me")).json()).user.id as string;
+
+  const profileHtml = await (await request.get(`/profile/${uid}`)).text();
+  const blocks = profileHtml.match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g) ?? [];
+  expect(blocks, "в профиле не оказалось блока структурированных данных").toHaveLength(1);
+  const ldBody = blocks[0].replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "");
+  expect(ldBody).toContain("\\u003c/script\\u003e");
+  expect(ldBody).not.toContain("</script>");
+  expect(profileHtml).not.toContain('<b class="xss2">');
 });
 
 // ── поиск по фото ────────────────────────────────────────────────────────

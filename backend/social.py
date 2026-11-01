@@ -51,10 +51,10 @@ def profile(user_id: str, viewer_id: str | None) -> dict:
         return profile_json(conn, require_user(conn, user_id), viewer_id)
 
 
-def user_pins(user_id: str) -> list[dict]:
+def user_pins(user_id: str, limit: int | None = None) -> list[dict]:
     with connection() as conn:
         require_user(conn, user_id)
-        return pins.cards(conn, pins.pins_of_user(conn, user_id))
+        return pins.cards(conn, pins.pins_of_user(conn, user_id, limit))
 
 
 def user_boards(user_id: str) -> list[dict]:

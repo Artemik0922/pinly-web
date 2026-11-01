@@ -15,7 +15,7 @@ import {
   apiUnfollow,
   apiUserBoards,
   apiUserPins,
-  type PublicUser,
+  type ProfileData,
 } from "@/lib/api/social";
 import { useUser } from "@/lib/state/session";
 import { countLabel } from "@/lib/plural";
@@ -25,18 +25,37 @@ import { MasonryGrid } from "@/components/ui/MasonryGrid";
 import { PublicBoardCard } from "@/components/board/PublicBoardCard";
 import { useToast } from "@/components/ui/Toast";
 
-type PublicData = { profile: PublicUser; pins: Pin[]; boards: PublicBoard[] };
-
-export function PublicProfile({ id }: { id: string }) {
+export function PublicProfile({
+  id,
+  initial = null,
+}: {
+  id: string;
+  /** Витрина, приехавшая с сервера. Без неё краулер и мессенджер видели
+   *  «Загрузка…» вместо работ мастера, а гость спрашивал бэкенд заново. */
+  initial?: ProfileData | null;
+}) {
   const { user } = useUser();
   const { show } = useToast();
   const router = useRouter();
-  const [data, setData] = useState<PublicData | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  // Серверная порция хранится вместе с id: при переходе между профилями
+  // данные предыдущего автора показаны быть не могут.
+  const [page, setPage] = useState<{ id: string; data: ProfileData | null } | null>(
+    initial ? { id, data: initial } : null,
+  );
   const [busy, setBusy] = useState(false);
   const [messaging, setMessaging] = useState(false);
+  const [widening, setWidening] = useState(false);
 
+  const data = page?.id === id ? page.data : null;
+  const loaded = page?.id === id;
+
+  const replace = (next: ProfileData | null) => setPage({ id, data: next });
+
+  // Сервер уже принёс витрину — повторный запрос на монтировании только
+  // перерисовал бы masonry. Если порции нет (бэкенд молчал), разбирается
+  // клиент, как до серверного рендера.
   useEffect(() => {
+    if (page?.id === id) return;
     const controller = new AbortController();
     let cancelled = false;
     Promise.all([
@@ -46,19 +65,16 @@ export function PublicProfile({ id }: { id: string }) {
     ])
       .then(([profile, pins, boards]) => {
         if (cancelled) return;
-        setData(profile ? { profile, pins, boards } : null);
+        setPage({ id, data: profile ? { profile, pins, boards } : null });
       })
       .catch(() => {
-        if (!cancelled) setData(null); // бэкенд недоступен — профиль закрыт
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
+        if (!cancelled) setPage({ id, data: null }); // бэкенд недоступен — профиль закрыт
       });
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [id]);
+  }, [id, page]);
 
   const toggleFollow = async () => {
     if (!data) return;
@@ -68,11 +84,27 @@ export function PublicProfile({ id }: { id: string }) {
       if (wasFollowing) await apiUnfollow(data.profile.id);
       else await apiFollow(data.profile.id);
       const updated = await apiPublicUser(data.profile.id);
-      if (updated) setData({ ...data, profile: updated });
+      if (updated) replace({ ...data, profile: updated });
     } catch {
       show(wasFollowing ? "Отписаться не вышло." : "Подписка не оформилась — попробуйте ещё раз.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Сервер приносит первую порцию пинов, остальное догружается по просьбе:
+  // иначе страница мастера с сотней загрузок приезжает в HTML сотней
+  // карточек. Счётчик в шапке при этом всегда полный — показываем, что
+  // скрыто, а не делаем вид, что пинов нет.
+  const showAllPins = async () => {
+    if (!data || widening) return;
+    setWidening(true);
+    try {
+      replace({ ...data, pins: await apiUserPins(data.profile.id) });
+    } catch {
+      show("Не удалось догрузить пины — попробуйте ещё раз.");
+    } finally {
+      setWidening(false);
     }
   };
 
@@ -161,10 +193,26 @@ export function PublicProfile({ id }: { id: string }) {
           ))}
       </div>
 
-      {pins.length > 0 && (
+      {(pins.length > 0 || profile.pinsCount > 0) && (
         <section className="mt-10">
           <h2 className="mb-4 text-lg font-bold">Пины пользователя</h2>
-          <MasonryGrid pins={pins} />
+          {pins.length > 0 ? (
+            <MasonryGrid pins={pins} />
+          ) : (
+            <p className="text-muted">Первую порцию пинов получить не удалось.</p>
+          )}
+          {pins.length < profile.pinsCount && (
+            <button
+              type="button"
+              onClick={showAllPins}
+              disabled={widening}
+              className="mt-4 w-full rounded-2xl bg-surface px-4 py-3 text-sm font-semibold hover:bg-surface-card disabled:opacity-50"
+            >
+              {widening
+                ? "Догружаю…"
+                : `Показать ещё ${countLabel(profile.pinsCount - pins.length, "пин", "пина", "пинов")}`}
+            </button>
+          )}
         </section>
       )}
 

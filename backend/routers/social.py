@@ -3,7 +3,7 @@
 
 import sqlite3
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from .. import notifications, ratelimit, social
 from ..deps import current_user, optional_user
@@ -18,8 +18,11 @@ def user_profile(user_id: str, viewer: sqlite3.Row | None = Depends(optional_use
 
 
 @router.get("/api/users/{user_id}/pins")
-def user_pins(user_id: str) -> dict:
-    return {"pins": social.user_pins(user_id)}
+def user_pins(user_id: str, limit: int | None = Query(None, ge=1, le=200)) -> dict:
+    """Пины автора. Без ?limit= — все, как было до появления параметра;
+    потолок 200 — чтобы страница мастера не отдавала сотни карточек в HTML.
+    """
+    return {"pins": social.user_pins(user_id, limit)}
 
 
 @router.get("/api/users/{user_id}/boards")

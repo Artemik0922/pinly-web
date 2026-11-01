@@ -3,11 +3,17 @@
 // обращаемся к бэкенду напрямую. Не ответил за секунду — берём общий title.
 
 import { cache } from "react";
-import { pinImageUrl } from "@/lib/pin";
+import { pinImageUrl, type Pin } from "@/lib/pin";
 import { backendJson } from "@/lib/server/backend";
 import type { PageMeta } from "@/lib/server/seo";
 import type { PublicBoard } from "@/lib/api/boards";
+import type { ProfileData, PublicUser } from "@/lib/api/social";
+
 const META_TIMEOUT_MS = 1500;
+
+// Первая порция пинов на витрине. Остальное гость добирает кнопкой: страница
+// мастера с сотней загрузок не должна приезжать сотней карточек в HTML.
+const PROFILE_PINS = 24;
 
 /**
  * Публичный срез доски — один запрос на рендер. Нужен и метаданным
@@ -38,15 +44,44 @@ export async function boardMeta(id: string): Promise<PageMeta | null> {
   };
 }
 
-export async function profileMeta(id: string): Promise<PageMeta | null> {
-  const data = await backendJson<{ user: { displayName: string; pinsCount: number } }>(
-    `/api/users/${encodeURIComponent(id)}`,
-    { timeoutMs: META_TIMEOUT_MS },
-  );
+/**
+ * Публичная витрина мастера — одним запросом на рендер. Профиль раньше
+ * собирался целиком на клиенте, и краулер (которому адрес уже отдан в
+ * sitemap) видел «Загрузка…» вместо досок, а гость платил двойным обращением
+ * к бэкенду.
+ *
+ * Сессия передаётся только ради `isSelf`: по нему страница решает, показывать
+ * приватный взгляд владельца или публичную витрину. Больше ничего cookie не
+ * меняет — секретные доски бэкенд не отдаёт и этому слою.
+ */
+export const profileData = cache(
+  async (id: string, session: string | null): Promise<ProfileData | null> => {
+    const path = `/api/users/${encodeURIComponent(id)}`;
+    const [user, boards, pins] = await Promise.all([
+      backendJson<{ user: PublicUser }>(path, { timeoutMs: META_TIMEOUT_MS, session }),
+      backendJson<{ boards: PublicBoard[] }>(`${path}/boards`, { timeoutMs: META_TIMEOUT_MS }),
+      backendJson<{ pins: Pin[] }>(`${path}/pins?limit=${PROFILE_PINS}`, {
+        timeoutMs: META_TIMEOUT_MS,
+      }),
+    ]);
+    if (!user) return null;
+    // Доски и пины — ухудшение, а не отказ: карточка есть, остальное догрузит
+    // клиент. Пустой список честнее отменённой страницы.
+    return { profile: user.user, boards: boards?.boards ?? [], pins: pins?.pins ?? [] };
+  },
+);
+
+export async function profileMeta(id: string, session: string | null): Promise<PageMeta | null> {
+  const data = await profileData(id, session);
   if (!data) return null;
+  // Превью для ссылки в чате: без og:image профиль мастера — серая полоска
+  // текста. Бер первую работу, а если их нет — аватар.
+  const first = data.pins[0];
   return {
-    title: data.user.displayName,
-    description: `${data.user.pinsCount} пинов и открытые доски автора в Pinly`,
+    title: data.profile.displayName,
+    description: `${data.profile.pinsCount} пинов и открытые доски автора в Pinly`,
     path: `/profile/${id}`,
+    imageUrl: first ? pinImageUrl(first) : data.profile.avatarUrl ?? undefined,
   };
 }
+

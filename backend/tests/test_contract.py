@@ -208,11 +208,31 @@ def test_profile_card_has_no_personal_fields(client, register):
     assert "email" not in str(profile)
 
 
-def test_user_pins_returns_everything_no_limit_yet(client, user):
-    """Сейчас у /api/users/{id}/pins нет LIMIT — профиль с тысячей пинов
-    вернёт тысячу карточек. Тест фиксирует дефолт ДО появления ?limit=.
+def test_user_pins_without_limit_returns_everything(client, user):
+    """Отсутствие ?limit= = все пины, как до появления параметра. Это дефолт,
+    на него опираются клиентские экраны (свой профиль показывает загрузки
+    целиком), поэтому он под замком даже теперь, когда кадрирование есть.
     Порядок (created_at desc) при одинаковых таймстампах неустойчив,
     поэтому сравниваем множество, а не последовательность."""
     ids = {upload(user, title=f"Пин {i}").json()["pin"]["id"] for i in range(3)}
     got = client.get(f"/api/users/{user['id']}/pins").json()["pins"]
     assert {p["id"] for p in got} == ids and len(got) == 3
+
+
+def test_user_pins_limit_trims_but_does_not_reorder(client, user):
+    """?limit= только режет хвост: первые N — те же самые пины, что и без
+    параметра. Профиль рендерится этим срезом, и «первая страница» обязана
+    совпадать с тем, что отдаёт полный список."""
+    for i in range(5):
+        upload(user, title=f"Пин {i}")
+    full = client.get(f"/api/users/{user['id']}/pins").json()["pins"]
+    page = client.get(f"/api/users/{user['id']}/pins", params={"limit": 3}).json()["pins"]
+    assert len(page) == 3
+    assert [p["id"] for p in page] == [p["id"] for p in full[:3]]
+
+
+def test_user_pins_limit_bounds(client, user):
+    """За пределом потолка — 422, а не тихое «вернули 200»: молчаливое
+    округление клиент прочитал бы как «у мастера всего 200 пинов»."""
+    assert client.get(f"/api/users/{user['id']}/pins", params={"limit": 201}).status_code == 422
+    assert client.get(f"/api/users/{user['id']}/pins", params={"limit": 0}).status_code == 422

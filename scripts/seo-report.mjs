@@ -104,6 +104,10 @@ function table(rows) {
   const pad = (s, n) => String(s).padEnd(n);
   console.log(
     pad("адрес", 46), pad("код", 5), pad("КБ", 6), pad("пины поток", 11), pad("пины payload", 13),
+    // Ссылки на доски считаются отдельно: для /board и /profile витрина — это
+    // именно они, и смотреть только на пины означало бы видеть пустоту там,
+    // где содержимое есть.
+    pad("доски поток", 13), pad("доски payload", 14),
     pad("og:image", 11), "пустой поток",
   );
   for (const r of rows) {
@@ -113,6 +117,8 @@ function table(rows) {
       pad((r.bytes / 1024).toFixed(1), 6),
       pad(r.pins, 11),
       pad(r.pinsAll, 13),
+      pad(r.boards, 13),
+      pad(r.boardsAll, 14),
       pad(r.og ? (r.ogLocal ? "localhost" : "да") : "НЕТ", 11),
       r.empty ? "ПУСТО" : "",
       r.error ?? "",
