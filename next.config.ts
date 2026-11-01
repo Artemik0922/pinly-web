@@ -1,5 +1,17 @@
 import type { NextConfig } from "next";
 
+// canonical, og:url и sitemap строятся из NEXT_PUBLIC_SITE_URL; при пустом
+// значении site.ts подставляет localhost:3000. Сайт при этом собирается и
+// работает — просто все его адреса ведут на машинку разработчика. Проверка
+// включается явным флагом, потому что CI и локальные прогоны собирают без
+// боевого домена намеренно.
+if (process.env.PINLY_REQUIRE_SITE_URL === "1" && !process.env.NEXT_PUBLIC_SITE_URL) {
+  throw new Error(
+    "NEXT_PUBLIC_SITE_URL пуст, а PINLY_REQUIRE_SITE_URL=1: соберётся сайт, у которого " +
+      "canonical, og:image и sitemap.xml указывают на localhost. Задайте домен в окружении сборки.",
+  );
+}
+
 // Same-origin прокси в Python-бэкенд: cookie-сессия ставится для домена сайта,
 // поэтому CORS не нужен ни в браузере, ни в тестах.
 //

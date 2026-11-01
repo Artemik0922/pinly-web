@@ -420,6 +420,7 @@ docker run -d -p 3000:3000 -v pinly-data:/app/.data \
 | Переменная | Зачем |
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | домен в `canonical`, OG-ссылках и `sitemap.xml`. Без него всё это указывает на `localhost:3000` |
+| `PINLY_REQUIRE_SITE_URL=1` | сборка падает, если домен пуст: молчаливый `localhost` в canonical заметен только через неделю пустых кликов |
 | `PINLY_JWT_SECRET` | подпись сессий. Иначе секрет генерируется один раз в `.data/secret.key`, а в проде сервер не стартует, если секрет не переживёт перезапуск |
 | `PINLY_ENV=production` | включает жёсткие проверки и закрывает сводку событий для посторонних |
 | `PINLY_TRUST_PROXY` | разрешает читать `X-Forwarded-For`, но только за своим reverse-proxy. Иначе лимиты обходятся одной строчкой в curl |
