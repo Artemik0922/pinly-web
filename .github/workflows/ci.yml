@@ -73,6 +73,18 @@ jobs:
           done
       - name: Смоук в браузере
         run: npm run test:e2e
+      - name: Аудит дизайн-системы
+        run: |
+          # Тот же контур, что и у смоука: dev-сервер нужен, чтобы мерить
+          # вычисленные стили живых страниц, а не читать CSS глазами.
+          nohup npm run dev > dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3000/ >/dev/null && break || sleep 2
+          done
+          npm run ui:audit
+      - name: Лог фронтенда при падении аудита
+        if: failure()
+        run: cat dev.log || true
       - name: Лог бэкенда при падении
         if: failure()
         run: cat backend.log
