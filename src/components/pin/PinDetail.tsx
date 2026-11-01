@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import type { Pin } from "@/lib/pin";
+import { sourceLabel, type Pin } from "@/lib/pin";
 import { categoryHref } from "@/lib/categories";
 import { track } from "@/lib/track";
 import { PinImage } from "@/components/feed/PinCard";
@@ -55,7 +55,7 @@ function AuthorBlock({ pin }: { pin: Pin }) {
             rel="noopener noreferrer"
             className="text-xs text-muted hover:text-muted"
           >
-            источник: {pin.provider} · CC {pin.license}
+            источник: {sourceLabel(pin) || "не указан"}
           </a>
         ) : (
           <p className="text-xs text-muted">{pin.userId ? "профиль автора" : "автор пина"}</p>

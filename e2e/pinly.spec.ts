@@ -128,6 +128,9 @@ test("доска отдаёт превью для мессенджера и кн
   // исполняют, а вот парсер, читающий payload целиком, раньше видел пустоту.
   expect((html.match(/href="\/pin\//g) ?? []).length, "в ответе доски нет ни одной работы").toBeGreaterThan(0);
   expect(html).toContain('"@type":"CollectionPage"');
+  // собранные из чужих картинок доски обязаны отдавать кредиты тому, кто их
+  // смотрит, а не прятать их на странице отдельного пина
+  expect(html).toContain("Источники");
 
   await page.goto(boardPath);
   await expect(page.getByRole("button", { name: "Поделиться" })).toBeVisible({ timeout: 40_000 });

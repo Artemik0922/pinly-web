@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { Pin } from "@/lib/pin";
+import { sourceLabel, type Pin } from "@/lib/pin";
 import { useBoards } from "@/lib/state/boards";
 import { useUser } from "@/lib/state/session";
 import { apiBoardPublic, type PublicBoard } from "@/lib/api/boards";
@@ -35,6 +35,54 @@ function NotFound() {
         К списку досок
       </Link>
     </div>
+  );
+}
+
+// Доска мастера собирается из чужих картинок по CC — кредит должен быть виден
+// там, где их показывают заказчику, а не только на странице отдельного пина.
+function hostOf(url?: string): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function Sources({ pins }: { pins: Pin[] }) {
+  const seen = new Map<string, Pin>();
+  for (const pin of pins) {
+    const key = `${pin.author}|${pin.pageUrl ?? ""}`;
+    if ((pin.author || pin.pageUrl) && !seen.has(key)) seen.set(key, pin);
+  }
+  const list = [...seen.values()].slice(0, 12);
+  if (list.length === 0) return null;
+
+  return (
+    <details className="mt-6 text-xs text-muted">
+      <summary className="cursor-pointer font-semibold">Источники · {list.length}</summary>
+      <ul className="mt-2 space-y-1">
+        {list.map((pin) => {
+          const host = hostOf(pin.pageUrl);
+          return (
+            <li key={pin.id} className="truncate">
+              {pin.author || "автор не указан"}
+              {sourceLabel(pin) ? ` — ${sourceLabel(pin)}` : ""}
+              {host && (
+                <a
+                  href={pin.pageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 underline underline-offset-2"
+                >
+                  {host}
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 
@@ -285,6 +333,7 @@ export function BoardView({
         {foreign.pins.length > 0 && (
           <div className="mt-6">
             <MasonryGrid pins={foreign.pins} />
+            <Sources pins={foreign.pins} />
           </div>
         )}
       </div>

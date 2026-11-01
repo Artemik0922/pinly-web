@@ -40,6 +40,16 @@ function proxyImage(url: string): string {
   return `/api/img?u=${encodeURIComponent(url)}`;
 }
 
+// Подпись источника: «flickr · CC by-sa 2.0». Лицензии у части источников нет
+// (TheMealDB), и дописывать к пустому месту «CC » — значит соврать о правах.
+// Формат значения разный у провайдеров: Openverse отдаёт «by-sa 2.0», Wikimedia
+// — «CC BY-SA 4.0», поэтому CC дописываем только когда его нет в начале.
+export function sourceLabel(pin: Pick<Pin, "provider" | "license">): string {
+  const license = pin.license?.trim();
+  const withCc = license ? (/^cc\b/i.test(license) ? license : `CC ${license}`) : "";
+  return [pin.provider, withCc].filter(Boolean).join(" · ");
+}
+
 export function pinImageUrl(
   pin: Pick<Pin, "id" | "seed" | "width" | "height" | "sourceUrl">,
 ): string {
