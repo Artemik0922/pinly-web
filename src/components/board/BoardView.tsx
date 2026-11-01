@@ -54,6 +54,7 @@ export function BoardView({
   const board = boards.find((b) => b.id === id);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shared, setShared] = useState(false);
   const [title, setTitle] = useState("");
   // Чужая доска: серверная порция либо ответ /api/boards/{id}/public.
   // Храним вместе с id — при переходе между досками ответ предыдущей
@@ -120,8 +121,16 @@ export function BoardView({
         return;
       }
       track.shareCopy(board.id);
-      if (nativeShare({ title: board.title, text: "Мои работы", url: withMark("share") })) return;
-      toast.show(copyToClipboard(withMark("link")) ? "Ссылка на доску скопирована" : "Браузер не дал скопировать ссылку");
+      if (nativeShare({ title: board.title, text: "Мои работы", url: withMark("share") })) {
+        setShared(true);
+        return;
+      }
+      if (copyToClipboard(withMark("link"))) {
+        setShared(true);
+        toast.show("Ссылка на доску скопирована");
+      } else {
+        toast.show("Браузер не дал скопировать ссылку");
+      }
     };
 
     return (
@@ -166,7 +175,17 @@ export function BoardView({
             </div>
           )}
           <p className="mt-1 text-sm text-muted">{pinCountLabel(boardPinCount(board))}</p>
-          <div className="mt-3 flex items-center justify-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            {/* «Поделиться» — главное действие мастера, оно первым: остальное
+                он трогает редко, а ссылку отправляет каждый раз */}
+            <button
+              type="button"
+              onClick={shareBoard}
+              className="flex min-h-11 items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90"
+            >
+              <IconShare size={14} />
+              Поделиться
+            </button>
             {user && (
               <button
                 type="button"
@@ -182,20 +201,19 @@ export function BoardView({
             )}
             <button
               type="button"
-              onClick={shareBoard}
-              className="flex min-h-11 items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90"
-            >
-              <IconShare size={14} />
-              Поделиться
-            </button>
-            <button
-              type="button"
               onClick={() => setConfirmDelete(true)}
-              className="min-h-11 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-hover"
+              className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold text-muted hover:bg-surface-hover"
             >
               Удалить доску
             </button>
           </div>
+          {/* Тост живёт пару секунд, а объяснение «что делать со ссылкой»
+              нужно именно сейчас */}
+          {shared && (
+            <p className="mt-2 text-sm text-muted">
+              Отправьте этот адрес заказчику — он увидит работы без регистрации.
+            </p>
+          )}
         </div>
 
         {/* сводка видна только владельцу доски: в этой ветке board есть всегда,

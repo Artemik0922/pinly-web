@@ -42,7 +42,7 @@ test("регистрация, секретная доска и коммента�
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
   // шапка увидела сессию без перезагрузки
   await expect(page.getByRole("button", { name: "Меню пользователя" })).toBeVisible();
 
@@ -103,7 +103,7 @@ test("доска отдаёт превью для мессенджера и кн
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   // пока сессия не поднята, доски уходят в localStorage
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
   await page.goto("/boards");
   await page.getByPlaceholder("Название новой доски…").fill(title);
@@ -151,6 +151,9 @@ test("доска отдаёт превью для мессенджера и кн
   expect(await page.evaluate("navigator.clipboard.readText()")).toBe(
     `${origin}${boardPath}?from=link`,
   );
+  // после копирования остаётся подсказка, что с этой ссылкой делать: тост
+  // живёт пару секунд, а объяснение нужно ровно в этот момент
+  await expect(page.getByText(/Отправьте этот адрес заказчику/)).toBeVisible();
 });
 
 test("браузер считает визит и приход на доску по метке источника", async ({ page }) => {
@@ -164,7 +167,7 @@ test("браузер считает визит и приход на доску �
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
   await page.goto("/boards");
   await page.getByPlaceholder("Название новой доски…").fill(title);
@@ -231,7 +234,7 @@ test("мастер видит цифры своей доски", async ({ page, 
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
   await page.goto("/boards");
   await page.getByPlaceholder("Название новой доски…").fill(title);
@@ -274,7 +277,7 @@ test("заголовок пина не разрывает блок структ�
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
   await page.goto("/pin/new");
   await page.setInputFiles('input[type="file"]', { name: "x.png", mimeType: "image/png", buffer: png });
@@ -332,6 +335,25 @@ test("лента не отдаёт моки поисковику", async ({ requ
   const map = await request.get("/sitemap.xml").then((r) => r.text());
   expect(map).toContain("/category/");
   expect(map).not.toContain("/pin/pin-");
+});
+
+test("после регистрации видно, что делать со своими досками", async ({ page }) => {
+  // Гипотеза «Кабинет мастера» начинается здесь: человек должен увидеть, что у
+  // него уже есть доски и что ссылкой на них делятся с заказчиком.
+  await page.goto("/signup");
+  await page.getByLabel("Имя", { exact: true }).fill("Новый Мастер");
+  await page.getByLabel("Email", { exact: true }).fill(`welcome${stamp}@example.test`);
+  await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+  await expect(page).toHaveURL("/boards?welcome=1");
+  const note = page.getByText(/Это ваши доски/);
+  await expect(note).toBeVisible();
+  await page.getByRole("button", { name: "Понятно" }).click();
+  await expect(note).toHaveCount(0);
+  // подсказка не оставляет после себя параметр в адресе
+  await expect(page).toHaveURL("/boards");
 });
 
 test("режим «по фото» открывается из поиска и держит форму", async ({ page }) => {

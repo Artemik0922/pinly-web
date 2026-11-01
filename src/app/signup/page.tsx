@@ -28,7 +28,9 @@ export default function SignupPage() {
     }
     try {
       await apiRegister({ email, password, displayName: displayName.trim(), consent });
-      await finish();
+      // не в ленту чужих картинок, а к своим доскам — там объяснение, что
+      // показывать заказчику
+      await finish("/boards?welcome=1");
     } catch (err) {
       fail(
         isStatus(err, 409)

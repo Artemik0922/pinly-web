@@ -3,7 +3,8 @@
 // Список досок пользователя + создание новой.
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { type Pin } from "@/lib/pin";
 import { PinImage } from "@/components/feed/PinCard";
 import { ConfirmDialog } from "@/components/ui/Confirm";
@@ -82,6 +83,37 @@ function BoardCard({ id }: { id: string }) {
   );
 }
 
+// Появляется только по ?welcome=1 — то есть сразу после регистрации, где
+// человек ещё не знает, что у него уже есть доски и что с ними делать.
+// Не оверлей: он не должен мешать ни клику по доске, ни тестам.
+function WelcomeNote({ count }: { count: number }) {
+  const params = useSearchParams();
+  const router = useRouter();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed || params.get("welcome") !== "1") return null;
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-surface p-4">
+      <p className="min-w-0 flex-1 text-sm">
+        <span className="font-semibold">Это ваши доски — {count}.</span> Откройте ту,
+        которую покажете заказчику, назовите её своими словами и нажмите «Поделиться»:
+        ссылку увидят без регистрации.
+      </p>
+      <button
+        type="button"
+        onClick={() => {
+          setDismissed(true);
+          router.replace("/boards");
+        }}
+        className="shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90"
+      >
+        Понятно
+      </button>
+    </div>
+  );
+}
+
 export default function BoardsPage() {
   const { boards, createBoard, ready } = useBoards();
   const { user, enabled } = useUser();
@@ -134,6 +166,11 @@ export default function BoardsPage() {
       </div>
 
       {!ready && <p className="py-10 text-center text-sm text-muted">Загрузка…</p>}
+
+      {/* useSearchParams статической страницы требует Suspense-границы */}
+      <Suspense fallback={null}>
+        <WelcomeNote count={boards.length} />
+      </Suspense>
 
       {ready && boards.length === 0 && (
         <div className="py-16 text-center">
