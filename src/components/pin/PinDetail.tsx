@@ -15,9 +15,11 @@ import { Comments } from "@/components/pin/Comments";
 import { MasonryGrid } from "@/components/ui/MasonryGrid";
 import { OwnerControls } from "@/components/pin/OwnerControls";
 import { PinActions } from "@/components/pin/PinActions";
+import { ReportButton } from "@/components/report/ReportButton";
 import { SaveControls } from "@/components/pin/SaveControls";
 import { IconArrowLeft, IconHeart } from "@/components/ui/Icons";
 import { useLikes } from "@/lib/state/likes";
+import { useUser } from "@/lib/state/session";
 
 // Кликабельный лайк: контур → залитое сердце, счётчик учитывает ваш.
 function LikeButton({ pinId, baseLikes }: { pinId: string; baseLikes: number }) {
@@ -74,6 +76,8 @@ function AuthorBlock({ pin }: { pin: Pin }) {
 }
 
 export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
+  const { user, ready } = useUser();
+  const ownPin = Boolean(pin.userId) && pin.userId === user?.id;
   // Показ страницы пина — главный вход с поиска и из мессенджеров. Без него
   // индексируемые страницы оставались единственными, о которых ничего не известно.
   useEffect(() => {
@@ -134,6 +138,15 @@ export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
               <OwnerControls pin={pin} />
             </div>
           </div>
+
+          {/* На свою загрузку жаловаться не на что — и незачем засорять сигнал,
+              который читает администрация. У пинов из внешних источников автора
+              в аккаунтах нет: они как раз и подлежат жалобе. */}
+          {ready && !ownPin ? (
+            <div className="flex justify-end">
+              <ReportButton pin={pin.id} />
+            </div>
+          ) : null}
         </div>
       </section>
 

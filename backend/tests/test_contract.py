@@ -154,6 +154,7 @@ def test_event_names_are_frozen():
         "pin_save",
         "share_copy",
         "signup_open",
+        "report",
     )
 
 

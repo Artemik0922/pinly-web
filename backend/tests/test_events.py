@@ -90,6 +90,42 @@ def test_summary_breaks_board_views_by_source(client, user):
     assert set(hits[0]) == {"source", "count", "visitors"}
 
 
+def test_report_event_reaches_summary(client, user):
+    """Жалоба — событие в той же таблице, а не новая сущность: пин, доска и
+    причина обязаны доходить до сводки, иначе кнопка «Пожаловаться» обещает то,
+    что никуда не попадает."""
+    client.post(
+        "/api/ev",
+        params={"name": "report", "pin": "pin-r", "source": "spam"},
+        cookies=user["cookies"],
+    )
+    client.post(
+        "/api/ev",
+        params={"name": "report", "board": "board-r", "source": "copyright"},
+        cookies=user["cookies"],
+    )
+
+    body = client.get("/api/ev/summary", params={"days": 2}, cookies=user["cookies"]).json()
+    by_pin = {x["pin"]: x for x in body["reports"] if x["pin"]}
+    by_board = {x["board"]: x for x in body["reports"] if x["board"]}
+    assert by_pin["pin-r"]["reason"] == "spam"
+    assert by_board["board-r"]["reason"] == "copyright"
+    assert set(next(iter(body["reports"]))) == {"pin", "board", "reason", "count", "visitors"}
+
+
+def test_report_reason_does_not_look_like_a_channel(client, user):
+    """source у board_view — канал перехода (?from=vk), и вся рекламная
+    разметка читает именно его. Причина жалобы лежит в том же столбце: сводка
+    по каналам не должна её подмешивать."""
+    client.post(
+        "/api/ev",
+        params={"name": "report", "pin": "pin-r2", "source": "spam"},
+        cookies=user["cookies"],
+    )
+    body = client.get("/api/ev/summary", params={"days": 2}, cookies=user["cookies"]).json()
+    assert "spam" not in [x["source"] for x in body["boardViewSources"]]
+
+
 def test_summary_requires_login(client):
     assert client.get("/api/ev/summary").status_code == 401
 

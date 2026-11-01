@@ -535,6 +535,39 @@ test("показ пина и сохранение в доску долетают
     .toBe(true);
 });
 
+test("жалоба с чужой страницы доходит до сводки", async ({ page }) => {
+  // Кнопка «Пожаловаться» бессмысленна, если сигнал остаётся на экране:
+  // проверяем весь путь — клик → событие report (пин + причина) → блок reports
+  // в сводке, которую читает владелец.
+  const sent: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/api/ev?")) sent.push(new URL(r.url()).search);
+  });
+
+  await page.goto("/pin/pin-1", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Пожаловаться" }).click();
+  await page.getByRole("menuitem", { name: "Спам или реклама" }).click();
+  await expect
+    .poll(() =>
+      sent.some((q) => q.includes("name=report") && q.includes("pin=pin-1") && q.includes("source=spam")),
+    )
+    .toBe(true);
+  await expect(page.locator("main").getByText(/Отмечено:/)).toBeVisible();
+
+  // сводка под замком: регистрируемся и читаем её тем же контекстом
+  await page.goto("/signup");
+  await page.getByLabel("Имя", { exact: true }).fill("Владелец Смоук");
+  await page.getByLabel("Email", { exact: true }).fill(`owner${stamp}@example.test`);
+  await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await expect(page).toHaveURL("/boards?welcome=1");
+
+  const summary = await (await page.request.get("/api/ev/summary?days=1")).json();
+  const hit = summary.reports.find((x: { pin: string }) => x.pin === "pin-1");
+  expect(hit?.reason, "жалоба не попала в сводку").toBe("spam");
+});
+
 test("режим «по фото» открывается из поиска и держит форму", async ({ page }) => {
   await page.goto("/search?by=image");
   await expect(page.getByRole("heading", { level: 1, name: "Поиск по фото" })).toBeVisible();

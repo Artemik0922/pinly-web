@@ -28,7 +28,19 @@ from .deps import session_payload
 # Белый список: name уходит и в SQL, и в сводку — произвольные строки тут не нужны.
 # pin_view — показ страницы пина (главный вход с поиска), signup_open — форма
 # регистрации открыли. Равенство списка закреплено тестом в test_contract.py.
-EVENTS = ("visit", "pin_view", "board_view", "board_created", "pin_save", "share_copy", "signup_open")
+# report — сигнал «с этим контентом что-то не так»; отдельной таблицы для
+# модерации нет, поэтому причина жалобы живёт в source, а pin/board — в своих
+# колонках. Очередь модерации появится, когда появятся жалобы.
+EVENTS = (
+    "visit",
+    "pin_view",
+    "board_view",
+    "board_created",
+    "pin_save",
+    "share_copy",
+    "signup_open",
+    "report",
+)
 
 MAX_ID_LEN = 64
 MAX_REF_LEN = 80
@@ -140,6 +152,13 @@ def summary(request: Request, days: int) -> dict:
             " group by ref_host order by c desc limit 10",
             (since,),
         ).fetchall()
+        reports = conn.execute(
+            "select pin_id, board_id, source as reason, count(*) as c,"
+            " count(distinct visitor) as visitors"
+            " from events where name = 'report' and day >= date('now', ?)"
+            " group by pin_id, board_id, source order by c desc limit 20",
+            (since,),
+        ).fetchall()
     return {
         "days": window,
         "events": [
@@ -152,6 +171,18 @@ def summary(request: Request, days: int) -> dict:
             {"source": r["source"], "count": r["c"], "visitors": r["visitors"]} for r in sources
         ],
         "boardViewReferrers": [{"host": r["ref_host"], "count": r["c"]} for r in refs],
+        # Жалобы: что за контент и по какой причине отметили. Это счётчики, а
+        # не очередь: разбирать будет человек по адресу из политики.
+        "reports": [
+            {
+                "pin": r["pin_id"],
+                "board": r["board_id"],
+                "reason": r["reason"],
+                "count": r["c"],
+                "visitors": r["visitors"],
+            }
+            for r in reports
+        ],
     }
 
 

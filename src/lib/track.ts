@@ -48,4 +48,8 @@ export const track = {
   pinSave: (pin: string, board: string, category?: string) =>
     send("pin_save", { pin, board, category }),
   shareCopy: (board: string) => send("share_copy", { board }),
+  // Жалоба на контент. Причина едет в source: отдельной колонки (и таблицы
+  // модерации) нет, а канал перехода считается только по board_view.
+  report: (target: { pin?: string; board?: string }, reason: string) =>
+    send("report", { ...target, source: reason }),
 };
