@@ -144,9 +144,13 @@ async function main() {
       console.log(`\n── ${type}: 0 адресов в карте`);
       continue;
     }
-    // детерминированная выборка: первые N, иначе каждый прогон меряет разное
+    // Детерминированная, но равномерная выборка: первые N адресов — это
+    // всегда один и тот же срез по дате, и в нём тонут пустые тестовые доски.
+    // Шаг по списку меряет и старые, и новые адреса.
+    const step = Math.max(1, Math.floor(list.length / SAMPLE));
+    const picks = list.filter((_, i) => i % step === 0).slice(0, SAMPLE);
     const rows = [];
-    for (const url of list.slice(0, SAMPLE)) rows.push(await audit(url));
+    for (const url of picks) rows.push(await audit(url));
     all.push(...rows);
     const emptyCount = rows.filter((r) => r.empty).length;
     console.log(
