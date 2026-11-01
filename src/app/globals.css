@@ -297,6 +297,21 @@ html[data-splash="on"] body {
   }
 }
 
+/* Скелетон лежит ПОД картинкой: место уже зарезервировано aspect-ratio, но
+   пока байты источника не доехали, ячейка выглядела белой дырой — а ссылку на
+   доску открывают из чата, где первая секунда и есть впечатление. JS не нужен:
+   приехавшая картинка перекрывает подложку сама. */
+.pin-skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--surface-card) 30%,
+    var(--surface-hover) 50%,
+    var(--surface-card) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
 /* Плавная смена темы без переполоха на первых кадрах */
 @media (prefers-reduced-motion: no-preference) {
   body,

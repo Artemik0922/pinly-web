@@ -18,6 +18,7 @@ import { IconCompass, IconInbox, IconLock, IconPencil, IconShare } from "@/compo
 import { ConfirmDialog } from "@/components/ui/Confirm";
 import { MasonryGrid } from "@/components/ui/MasonryGrid";
 import { BoardStats } from "@/components/board/BoardStats";
+import { BoardContact } from "@/components/board/BoardContact";
 import { ReportButton } from "@/components/report/ReportButton";
 import { useToast } from "@/components/ui/Toast";
 import { track } from "@/lib/track";
@@ -338,9 +339,10 @@ export function BoardView({
           </div>
         )}
 
-        {/* Чужая витрина — то, что видят посетители. Если картинка украдена или
-            это спам, сигнал должен быть виден им, а не спрятан в меню. */}
-        <div className="mt-6 flex justify-end">
+        {/* Единственный шаг, который остаётся заказчику: написать мастеру. */}
+        <BoardContact owner={foreign.owner} />
+
+        <div className="mt-3 flex justify-end">
           <ReportButton board={id} />
         </div>
       </div>

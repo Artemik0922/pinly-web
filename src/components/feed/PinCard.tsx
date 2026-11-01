@@ -52,8 +52,11 @@ export function PinImage({
 
   return (
     // Коробка с aspect-ratio резервирует место всегда: картинка доезжает и
-    // вставляется в уже готовую ячейку, сетка не перетекает.
-    <div style={ratio} className="w-full overflow-hidden rounded-2xl">
+    // вставляется в уже готовую ячейку, сетка не перетекает. Пока байтов нет,
+    // ячейка не белая дыра — под картинкой лежит скелетон, и закрытая ссылка
+    // на доску в чате выглядит как «работы сейчас появятся», а не как пустой
+    // сайт. JS для этого не нужен: картинка перекрывает скелетон сама.
+    <div style={ratio} className="pin-skeleton w-full overflow-hidden rounded-2xl">
       <Image
         src={src}
         alt={pin.title}
