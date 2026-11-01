@@ -68,6 +68,43 @@ test("регистрация, секретная доска и коммента�
   await expect(page.getByText(`Смоук-комментарий ${stamp}`)).toHaveCount(0);
 });
 
+test("доска, созданная во время загрузки списка, остаётся на месте", async ({ page }) => {
+  // После первого входа стартовые доски создаются последовательно (~полсекунды),
+  // а форма на странице живёт с самого начала. Снапшот сервера, приехавший
+  // позже, затирал доску, созданную в это окно: человек нажимал «Создать» и
+  // видел, как она исчезает. Ответ списка целенаправленно задерживаем.
+  const title = `Гонка ${stamp}`;
+  // Гонка реальная: сервер отвечает на GET списка до того, как созданная доска
+  // записана, но ответ доходит до клиента позже. Держим снапшот пустого списка
+  // у экрана, а не задерживаем сам запрос — иначе сервер успеет увидеть новую
+  // доску и проверять станет нечего.
+  await page.route("**/api/boards", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return route.fulfill({ response });
+  });
+
+  await page.goto("/signup");
+  await page.getByLabel("Имя", { exact: true }).fill("Гонка Смоук");
+  await page.getByLabel("Email", { exact: true }).fill(`race${stamp}@example.test`);
+  await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await expect(page).toHaveURL("/boards?welcome=1");
+
+  await page.getByPlaceholder("Название новой доски…").fill(title);
+  await page.getByRole("button", { name: "Создать", exact: true }).click();
+  const link = page.locator('main a[href^="/board/"]').filter({ hasText: title });
+  await expect(link).toBeVisible();
+  // Дальше — сам момент гонки: задержанный снапшот доходит и заменяет список.
+  // Без слияния доска пропадает из интерфейса, оставаясь на сервере.
+  await page.waitForTimeout(1600);
+  await expect(link).toBeVisible();
+  // стартовые доски при этом на месте: слияние не отменяет снапшот
+  await expect(page.locator('main a[href^="/board/"]')).toHaveCount(4);
+});
+
 test("поиск отвечает заголовком и результатами", async ({ page }) => {
   await page.goto(`/search?q=${encodeURIComponent("кухня")}`);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Поиск");

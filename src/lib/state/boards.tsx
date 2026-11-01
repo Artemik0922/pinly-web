@@ -83,21 +83,42 @@ export function BoardsProvider({ children }: { children: ReactNode }) {
     if (!userReady) return;
     let cancelled = false;
 
-    const apply = (next: { boards: Board[]; activeBoardId: string | null }) => {
+    // Снапшот сервера мог приехать позже, чем запись пользователя: форма
+    // создания доски живёт на странице сразу, а стартовые доски первого входа
+    // создаются последовательно (~полсекунды). Без слияния доска, нажатая в это
+    // окно, исчезала из списка, оставаясь на сервере.
+    //
+    // keepFrom — с какого момента записи считать «своими»: локальные доски
+    // анонимного режима сервер не знает, и тащить их рядом с серверными
+    // значило бы плодить дубли. Держим только то, что создано после старта
+    // загрузки.
+    const apply = (
+      next: { boards: Board[]; activeBoardId: string | null },
+      keepFrom: number | null = null,
+    ) => {
       if (cancelled) return;
-      setBoards(next.boards);
+      if (keepFrom === null) {
+        setBoards(next.boards);
+      } else {
+        setBoards((prev) => {
+          const ids = new Set(next.boards.map((b) => b.id));
+          const extra = prev.filter((b) => !ids.has(b.id) && b.createdAt >= keepFrom);
+          return extra.length ? [...next.boards, ...extra] : next.boards;
+        });
+      }
       setActiveBoardIdState(next.activeBoardId);
     };
 
     (async () => {
+      const startedAt = Date.now();
       if (dbMode && user) {
         // ── Свой бэкенд аккаунтов: доски в SQLite через /api/boards ──
         try {
           const loaded = await loadServerBoards(user.id);
-          apply({ boards: loaded, activeBoardId: loaded[0]?.id ?? null });
+          apply({ boards: loaded, activeBoardId: loaded[0]?.id ?? null }, startedAt);
         } catch {
           // бэкенд недоступен (упал после логина) — деградация в локальный режим
-          apply(loadLocal());
+          apply(loadLocal(), startedAt);
         }
       } else {
         // аноним; заодно сбрасываем кэш — после повторного входа
