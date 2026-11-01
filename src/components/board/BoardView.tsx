@@ -184,7 +184,7 @@ export function BoardView({
     };
 
     return (
-      <div className="mx-auto w-full max-w-[1800px] px-4 py-6">
+      <div className="mx-auto w-full max-w-[1240px] px-4 py-6">
         <div className="text-center">
           {editing ? (
             <form
@@ -309,7 +309,7 @@ export function BoardView({
 
   if (foreign) {
     return (
-      <div className="mx-auto w-full max-w-[1800px] px-4 py-6">
+      <div className="mx-auto w-full max-w-[1240px] px-4 py-6">
         <div className="text-center">
           <h1 className="text-3xl font-extrabold">{foreign.title}</h1>
           <p className="mt-1 text-sm text-muted">{pinCountLabel(boardPinCount(foreign))}</p>
