@@ -26,7 +26,9 @@ from .db import connection
 from .deps import session_payload
 
 # Белый список: name уходит и в SQL, и в сводку — произвольные строки тут не нужны.
-EVENTS = ("visit", "board_view", "board_created", "pin_save", "share_copy", "signup_open")
+# pin_view — показ страницы пина (главный вход с поиска), signup_open — форма
+# регистрации открыли. Равенство списка закреплено тестом в test_contract.py.
+EVENTS = ("visit", "pin_view", "board_view", "board_created", "pin_save", "share_copy", "signup_open")
 
 MAX_ID_LEN = 64
 MAX_REF_LEN = 80

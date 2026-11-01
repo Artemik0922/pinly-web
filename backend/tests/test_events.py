@@ -37,6 +37,31 @@ def test_event_stored_anonymously(client):
     assert len(row["visitor"]) == 24 and row["visitor"].isalnum()
 
 
+
+def test_pin_view_and_pin_save_board_are_recorded(client, user):
+    """pin_view — показы главного входа с поиска; board в pin_save — шаг
+    воронки «сохранил в доску». Без них «пришёл → сохранил» не собирается."""
+    client.post("/api/ev", params={"name": "pin_view", "pin": "pin-7"}, cookies=user["cookies"])
+    client.post(
+        "/api/ev",
+        params={"name": "pin_save", "pin": "pin-7", "board": "b-7"},
+        cookies=user["cookies"],
+    )
+
+    body = client.get("/api/ev/summary", params={"days": 2}, cookies=user["cookies"]).json()
+    assert [e for e in body["events"] if e["name"] == "pin_view"], body["events"]
+    assert [e for e in body["events"] if e["name"] == "pin_save"], body["events"]
+
+    # в сводке board_id не показывается, но потеряться он не имеет права
+    from backend.db import connection
+
+    with connection() as conn:
+        row = conn.execute(
+            "select board_id, pin_id from events where name = 'pin_save'"
+            " order by ts desc limit 1"
+        ).fetchone()
+    assert row["board_id"] == "b-7" and row["pin_id"] == "pin-7"
+
 def test_event_attributes_known_user(client, user):
     client.post("/api/ev", params={"name": "share_copy", "board": "b-2"}, cookies=user["cookies"])
     row = db("select * from events where board_id = 'b-2'")[-1]

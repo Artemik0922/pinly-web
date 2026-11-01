@@ -37,9 +37,15 @@ function fromParam(): string | undefined {
 
 export const track = {
   visit: () => send("visit"),
+  // Страница пина — главный вход с поиска и из мессенджеров; без pin_view
+  // показы индексируемых страниц не измерялись вовсе.
+  pinView: (pin: string) => send("pin_view", { pin, source: fromParam() }),
   signupOpen: () => send("signup_open"),
   boardView: (board: string) => send("board_view", { board, source: fromParam() }),
   boardCreated: (board: string) => send("board_created", { board }),
-  pinSave: (pin: string, category?: string) => send("pin_save", { pin, category }),
+  // board обязателен: без него «сохранили в доску» и «доску создали» — разные
+  // шаги одной воронки, которые нельзя разделить в сводке
+  pinSave: (pin: string, board: string, category?: string) =>
+    send("pin_save", { pin, board, category }),
   shareCopy: (board: string) => send("share_copy", { board }),
 };

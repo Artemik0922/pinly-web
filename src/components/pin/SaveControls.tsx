@@ -36,15 +36,22 @@ export function SaveControls({ pin, size = "compact" }: { pin: Pin; size?: "comp
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Единственный путь «пин лёг в доску»: выбор из меню и быстрое сохранение
+  // должны считаться одинаково. togglePin ещё и снимает — это не сохранение.
+  const saveTo = (boardId: string) => {
+    const already = boards.find((b) => b.id === boardId)?.pins.some((p) => p.id === pin.id);
+    togglePin(boardId, pin);
+    setActiveBoardId(boardId);
+    if (!already) track.pinSave(pin.id, boardId, pin.category);
+  };
+
   const quickSave = async () => {
     try {
       let boardId = activeBoardId;
       if (!boardId || !boards.some((b) => b.id === boardId)) {
         boardId = (await createBoard("Моя доска")).id;
       }
-      setActiveBoardId(boardId);
-      togglePin(boardId, pin);
-      track.pinSave(pin.id, pin.category);
+      saveTo(boardId);
     } catch {
       // причину уже показал store — здесь только гасим неисполненное обещание
     }
@@ -54,7 +61,7 @@ export function SaveControls({ pin, size = "compact" }: { pin: Pin; size?: "comp
     try {
       const board = await createBoard(newTitle);
       togglePin(board.id, pin);
-      track.pinSave(pin.id, pin.category);
+      track.pinSave(pin.id, board.id, pin.category);
       setActiveBoardId(board.id);
       setNewTitle("");
       setOpen(false);
@@ -128,8 +135,7 @@ export function SaveControls({ pin, size = "compact" }: { pin: Pin; size?: "comp
                       role="menuitemcheckbox"
                       aria-checked={checked}
                       onClick={() => {
-                        togglePin(board.id, pin);
-                        setActiveBoardId(board.id);
+                        saveTo(board.id);
                       }}
                       className="flex min-h-11 w-full items-center gap-2 rounded-xl px-2 text-left text-sm hover:bg-surface-hover"
                     >

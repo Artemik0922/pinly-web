@@ -5,8 +5,10 @@
 // (скачать/поделиться/в чат) и OwnerControls (править/удалить) — свои файлы.
 
 import Link from "next/link";
+import { useEffect } from "react";
 import type { Pin } from "@/lib/pin";
 import { categoryHref } from "@/lib/categories";
+import { track } from "@/lib/track";
 import { PinImage } from "@/components/feed/PinCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { Comments } from "@/components/pin/Comments";
@@ -72,6 +74,12 @@ function AuthorBlock({ pin }: { pin: Pin }) {
 }
 
 export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
+  // Показ страницы пина — главный вход с поиска и из мессенджеров. Без него
+  // индексируемые страницы оставались единственными, о которых ничего не известно.
+  useEffect(() => {
+    track.pinView(pin.id);
+  }, [pin.id]);
+
   return (
     <div className="mx-auto w-full max-w-[1050px] px-4">
       <Link

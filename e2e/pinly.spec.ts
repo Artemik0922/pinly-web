@@ -47,7 +47,6 @@ test("регистрация, секретная доска и коммента�
   await expect(page.getByRole("button", { name: "Меню пользователя" })).toBeVisible();
 
   // 2. секретная доска
-  await page.goto("/boards");
   await page.getByPlaceholder("Название новой доски…").fill(`Смоук ${stamp}`);
   await page.getByLabel("Секретная").check();
   await page.getByRole("button", { name: "Создать", exact: true }).click();
@@ -105,7 +104,6 @@ test("доска отдаёт превью для мессенджера и кн
   // пока сессия не поднята, доски уходят в localStorage
   await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
-  await page.goto("/boards");
   await page.getByPlaceholder("Название новой доски…").fill(title);
   await page.getByRole("button", { name: "Создать", exact: true }).click();
 
@@ -135,7 +133,7 @@ test("доска отдаёт превью для мессенджера и кн
   await expect(page.getByRole("button", { name: "Поделиться" })).toBeVisible({ timeout: 40_000 });
   // сама карточка может быть ещё не видима (картинка едет через прокси),
   // но доска обязана показывать, что работа в ней одна
-  await expect(page.getByText(/1 пин/)).toBeVisible();
+  await expect(page.locator("main").getByText(/1 пин/)).toBeVisible();
   await expect(page.locator('main a[href^="/pin/pin-1"]')).toHaveCount(1);
 
   // клик по «Поделиться» обязан положить в буфер ровно адрес этой доски
@@ -153,7 +151,7 @@ test("доска отдаёт превью для мессенджера и кн
   );
   // после копирования остаётся подсказка, что с этой ссылкой делать: тост
   // живёт пару секунд, а объяснение нужно ровно в этот момент
-  await expect(page.getByText(/Отправьте этот адрес заказчику/)).toBeVisible();
+  await expect(page.locator("main").getByText(/Отправьте этот адрес заказчику/)).toBeVisible();
 });
 
 test("браузер считает визит и приход на доску по метке источника", async ({ page }) => {
@@ -169,7 +167,6 @@ test("браузер считает визит и приход на доску �
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
-  await page.goto("/boards");
   await page.getByPlaceholder("Название новой доски…").fill(title);
   await page.getByRole("button", { name: "Создать", exact: true }).click();
   const link = page.locator('main a[href^="/board/"]').filter({ hasText: title });
@@ -236,7 +233,6 @@ test("мастер видит цифры своей доски", async ({ page, 
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
-  await page.goto("/boards");
   await page.getByPlaceholder("Название новой доски…").fill(title);
   await page.getByRole("button", { name: "Создать", exact: true }).click();
   const link = page.locator('main a[href^="/board/"]').filter({ hasText: title });
@@ -354,6 +350,29 @@ test("после регистрации видно, что делать со с�
   await expect(note).toHaveCount(0);
   // подсказка не оставляет после себя параметр в адресе
   await expect(page).toHaveURL("/boards");
+});
+
+test("показ пина и сохранение в доску долетают до счётчика", async ({ page }) => {
+  // Модель рекламная: платят за показы индексируемых страниц. pin_view раньше
+  // не отправлялся вовсе, а pin_save — без board нельзя отличить от «создал
+  // доску».
+  const sent: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/api/ev?")) sent.push(new URL(r.url()).search);
+  });
+
+  await page.goto("/pin/pin-1", { waitUntil: "domcontentloaded" });
+  await expect.poll(() => sent.some((q) => q.includes("name=pin_view") && q.includes("pin=pin-1"))).toBe(
+    true,
+  );
+
+  await page.getByRole("button", { name: /^Доска для сохранения/ }).first().click();
+  const item = page.getByRole("menuitemcheckbox").first();
+  await item.waitFor();
+  await item.click();
+  await expect
+    .poll(() => sent.some((q) => q.includes("name=pin_save") && q.includes("board=")))
+    .toBe(true);
 });
 
 test("режим «по фото» открывается из поиска и держит форму", async ({ page }) => {

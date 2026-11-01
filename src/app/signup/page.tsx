@@ -4,11 +4,12 @@
 // Факт согласия логирует сервер: consent_log (user_id, версия документа, UA).
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiRegister } from "@/lib/api/auth";
 import { isStatus } from "@/lib/api/http";
 import { AuthError, AuthShell, AuthSubmit } from "@/components/auth/AuthShell";
 import { useAuthFlow } from "@/components/auth/useAuthFlow";
+import { track } from "@/lib/track";
 import { Field } from "@/components/ui/Field";
 
 export default function SignupPage() {
@@ -17,6 +18,12 @@ export default function SignupPage() {
   const [displayName, setDisplayName] = useState("");
   const [consent, setConsent] = useState(false);
   const { busy, error, start, finish, fail } = useAuthFlow();
+
+  // Событие было объявлено с самого начала и ниоткуда не вызывалось: без него
+  // не видно, сколько людей дошло до формы и отвалилось на ней.
+  useEffect(() => {
+    track.signupOpen();
+  }, []);
 
   const signUp = async (e: React.FormEvent) => {
     e.preventDefault();

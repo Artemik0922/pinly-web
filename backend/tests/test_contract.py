@@ -148,6 +148,7 @@ def test_event_names_are_frozen():
 
     assert events.EVENTS == (
         "visit",
+        "pin_view",
         "board_view",
         "board_created",
         "pin_save",
