@@ -36,6 +36,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: ffmpeg для видео-тестов
+        # Без него постер не снимается, и ветка «видео» деградирует до
+        # отсутствия кадра. Тесты на это завязаны: pytest умеет пропускать,
+        # смоук в браузере проверяет настоящий путь и пропускать не должен.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Зависимости
         run: pip install -r backend/requirements-dev.txt
       - name: pytest
@@ -56,6 +61,8 @@ jobs:
           python-version: "3.13"
       - run: npm ci
       - run: pip install -r backend/requirements.txt
+      - name: ffmpeg для видео-смоука
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Браузер для Playwright
         run: npx playwright install --with-deps chromium
       - name: Бэкенд в фоне

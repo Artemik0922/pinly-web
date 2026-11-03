@@ -616,16 +616,26 @@ test("поле, режим и источник фото — в одной стр
 
 test("меню источников фото: камера, файл, буфер — открывается сразу по pick=1", async ({ page }) => {
   const menu = page.getByRole("menu");
+  const trigger = page.getByRole("button", { name: /Добавить фото|Фото/ });
   // вход в режим по ссылке из шапки разворачивает меню без лишнего тапа
   await page.goto("/search?by=image&pick=1");
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: /Камера/ })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: /Файл с компьютера/ })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: /Из буфера обмена/ })).toBeVisible();
+
+  // Меню приехало с сервера уже открытым, поэтому первый клик обязателен: до
+  // гидрации слушателя Escape нет, и проверка «нажал Escape — закрылось»
+  // превращалась в гонку с загрузкой скрипта. Клик гидрацию вызывает сам.
+  await trigger.click();
+  await expect(menu).toHaveCount(0);
   // закрыли — флаг сбрасывается, чтобы перезагрузка не открывала меню заново
+  await expect(page).toHaveURL("/search?by=image");
+
+  await trigger.click();
+  await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  await expect(page).toHaveURL("/search?by=image");
 });
 
 test("поиск по фото отвечает честным статусом и объясняет по-русски", async ({ request }) => {
