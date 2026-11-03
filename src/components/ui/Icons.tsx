@@ -293,6 +293,14 @@ export function IconPlay({ size = 16, className }: IconProps) {
   );
 }
 
+export function IconPause({ size = 16, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z" />
+    </svg>
+  );
+}
+
 // Летучая мышь — иконка "bat" Delapouite из набора game-icons (CC BY 3.0),
 // https://game-icons.net/1x1/delapouite/bat.html. Заливка вместо обводки:
 // силуэт с расправленными крыльями обводкой не читается.

@@ -272,6 +272,30 @@ def test_board_snapshot_carries_slides_and_rejects_a_foreign_scheme(user, mp4):
     assert rejected.status_code == 400
 
 
+def test_size_ceilings_are_per_kind(user):
+    """Картинка отсекается на 10 МБ, видео — на 60 МБ: одна планка на оба
+    типа либо резала бы ролики, либо пускала бы в память стомегбайтные файлы."""
+    big_png = PNG + b"\x00" * (11 * 1024 * 1024)
+    over_image = user["client"].post(
+        "/api/pins",
+        files=[("files", ("big.png", big_png, "image/png"))],
+        data={"title": "Слишком большая"},
+        cookies=user["cookies"],
+    )
+    assert over_image.status_code == 413
+    assert "10 MB" in over_image.text
+
+    big_mp4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * (61 * 1024 * 1024)
+    over_video = user["client"].post(
+        "/api/pins",
+        files=[("files", ("big.mp4", big_mp4, "video/mp4"))],
+        data={"title": "Слишком длинное"},
+        cookies=user["cookies"],
+    )
+    assert over_video.status_code == 413
+    assert "60 MB" in over_video.text
+
+
 def test_probe_survives_a_non_video_file(tmp_path):
     """ffprobe на мусоре не должен ронять загрузку: проба возвращает пустой
     словарь, и пин приезжает без длительности, но живым."""

@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMediaDuration, type PinSlide } from "@/lib/pin";
 import { SlideImage } from "@/components/ui/SlideImage";
-import { IconChevronLeft, IconChevronRight, IconPlay } from "@/components/ui/Icons";
+import { IconChevronLeft, IconChevronRight, IconPause, IconPlay } from "@/components/ui/Icons";
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 // Свайп внутри ссылки-карточки не должен превращаться в переход: после
@@ -201,28 +201,32 @@ export function MediaCarousel({
       {multiple && (
         <>
           {/* Точки: видимая часть — 6 px, зона нажатия — 44, как у всех кнопок
-              интерфейса. Без них листание мышью неоткрываемо. */}
+              интерфейса. Без них листание мышью неоткрываемо. Под точками
+              лежит полупрозрачная пилюля: на светлой работе мастера белые
+              точки сливались с фоном и индикатор исчезал. */}
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-center">
-            {slides.map((slide, i) => (
-              <button
-                key={`dot-${i}`}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  goTo(i);
-                }}
-                aria-label={`Слайд ${i + 1} из ${slides.length}${slide.kind === "video" ? ", видео" : ""}`}
-                aria-current={i === index}
-                className="grid h-11 w-7 place-items-center"
-              >
-                <span
-                  className={`block h-1.5 rounded-full transition-all duration-200 ease-pop ${
-                    i === index ? "w-5 bg-white" : "w-1.5 bg-white/60"
-                  }`}
-                />
-              </button>
-            ))}
+            <div className="flex items-center rounded-full bg-black/35 px-0.5 py-1">
+              {slides.map((slide, i) => (
+                <button
+                  key={`dot-${i}`}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    goTo(i);
+                  }}
+                  aria-label={`Слайд ${i + 1} из ${slides.length}${slide.kind === "video" ? ", видео" : ""}`}
+                  aria-current={i === index}
+                  className="grid h-11 w-7 place-items-center"
+                >
+                  <span
+                    className={`block h-1.5 rounded-full transition-all duration-200 ease-pop ${
+                      i === index ? "w-5 bg-white" : "w-1.5 bg-white/70"
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
           </div>
           <p className="sr-only" aria-live="polite">
             Слайд {index + 1} из {slides.length}
@@ -283,6 +287,10 @@ function Media({
   videoRef: (node: HTMLVideoElement | null) => void;
 }) {
   const player = useRef<HTMLVideoElement | null>(null);
+  // Пауза живёт в состоянии слайда, а источник истины — сами события <video>:
+  // эффект карусели ставит паузу, когда слайд становится неактивным, и читалка
+  // не должна показывать «Пауза» на уже остановленном ролике.
+  const [paused, setPaused] = useState(false);
   const width = slide.width || 800;
   const height = slide.height || 1200;
 
@@ -332,16 +340,29 @@ function Media({
         preload={variant === "detail" ? "metadata" : "none"}
         aria-label={`Видео: ${alt}${slide.durationMs ? `, ${formatMediaDuration(slide.durationMs)}` : ""}`}
         onError={onBroken}
-        onClick={() => {
-          // в карточке ролик уже играет сам; тап по нему — пауза, чтобы шум
-          // в ленте можно было остановить, не уходя со страницы
-          const video = player.current;
-          if (variant !== "card" || !video) return;
-          if (video.paused) void video.play().catch(() => undefined);
-          else video.pause();
-        }}
+        onPlay={() => setPaused(false)}
+        onPause={() => setPaused(true)}
         className="h-full w-full bg-black object-cover"
       />
+      {variant === "card" && (
+        // Кнопка, а не тап по ролику: карточка целиком — ссылка на пин, и жест
+        // «остановить видео» не имеет права с ней спорить.
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const video = player.current;
+            if (!video) return;
+            if (video.paused) void video.play().catch(() => undefined);
+            else video.pause();
+          }}
+          aria-label={paused ? "Воспроизвести видео" : "Остановить видео"}
+          className="absolute bottom-12 left-3 grid h-11 w-11 place-items-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+        >
+          {paused ? <IconPlay size={16} /> : <IconPause size={16} />}
+        </button>
+      )}
       {variant === "card" && slide.durationMs ? (
         <p className="pointer-events-none absolute bottom-12 right-3 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-xs font-semibold text-white">
           <IconPlay size={10} />

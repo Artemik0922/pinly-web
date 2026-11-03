@@ -732,6 +732,15 @@ test("пин с видео и слайдами листается и не лом
   expect(sliced.status()).toBe(206);
   expect(sliced.headers()["content-range"]).toMatch(/^bytes 0-99\/\d+$/);
 
+  // И ещё раз про серверный HTML, но уже по настоящим адресам: краулер и
+  // донашиватель не исполняют JS, и если носителей в их ответе нет — для них
+  // страница пина с видео пустая.
+  const markup = await (await page.request.get(`/pin/${pinId}`)).text();
+  expect(markup, "в серверном HTML нет постера").toContain(poster as string);
+  expect(markup, "в серверном HTML нет файла видео").toContain(
+    (await video.getAttribute("src")) as string,
+  );
+
   await page.getByRole("button", { name: "Следующий слайд" }).click();
   await expect(page.getByText("2/2")).toBeVisible();
   await expect(page.getByRole("button", { name: "Следующий слайд" })).toBeDisabled();
@@ -772,4 +781,17 @@ test("пин с видео и слайдами листается и не лом
   // и сам ролик влезает в ту же ячейку: сетка на листании не перетекает
   const videoBox = await cardVideo.boundingBox();
   expect(videoBox?.height ?? 0).toBeCloseTo(after?.height ?? 0, -1);
+
+  // Пауза — отдельная кнопка. Тап по ролику уводит на страницу пина, потому
+  // что карточка целиком является ссылкой: два жеста в одном месте жить не
+  // должны, иначе «остановить видео» оказывается «открыть пин».
+  await card.getByRole("button", { name: "Остановить видео" }).click();
+  await expect(cardVideo).toHaveJSProperty("paused", true);
+  await expect(card.getByRole("button", { name: "Воспроизвести видео" })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+  await card.getByRole("button", { name: "Воспроизвести видео" }).click();
+  await expect(cardVideo).toHaveJSProperty("paused", false);
+
+  await cardVideo.click();
+  await expect(page).toHaveURL(new RegExp(`/pin/${pinId}`));
 });
