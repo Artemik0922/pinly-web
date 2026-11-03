@@ -238,6 +238,40 @@ def test_pin_without_slides_returns_empty_list(user):
     assert listed["slides"] == pin["slides"]
 
 
+def test_board_snapshot_carries_slides_and_rejects_a_foreign_scheme(user, mp4):
+    """Доска хранит снапшот карточки, а не ссылку на пин: носители обязаны
+    доехать до неё, и чужая схема в url слайда должна отвалиться на входе —
+    карточка рисуется у чужих людей."""
+    created = user["client"].post(
+        "/api/pins",
+        files=[
+            ("files", ("clip.mp4", mp4, "video/mp4")),
+            ("files", ("after.png", PNG, "image/png")),
+        ],
+        data={"title": "Видео + чертёж"},
+        cookies=user["cookies"],
+    )
+    assert created.status_code == 200, created.text
+    pin = created.json()["pin"]
+    board = user["client"].post(
+        "/api/boards", json={"title": "Моя витрина"}, cookies=user["cookies"]
+    )
+    assert board.status_code == 200, board.text
+    board_id = board.json()["board"]["id"]
+    put = f"/api/boards/{board_id}/pins/{pin['id']}"
+
+    saved = user["client"].put(put, json=pin, cookies=user["cookies"])
+    assert saved.status_code == 204, saved.text
+    public = user["client"].get(f"/api/boards/{board_id}/public").json()["board"]
+    assert [s["kind"] for s in public["pins"][0]["slides"]] == ["video", "image"]
+    assert public["pins"][0]["slides"][0]["posterUrl"], "постер потерялся в снапшоте"
+
+    tampered = dict(pin)
+    tampered["slides"] = [{"kind": "image", "url": "javascript:alert(1)"}]
+    rejected = user["client"].put(put, json=tampered, cookies=user["cookies"])
+    assert rejected.status_code == 400
+
+
 def test_probe_survives_a_non_video_file(tmp_path):
     """ffprobe на мусоре не должен ронять загрузку: проба возвращает пустой
     словарь, и пин приезжает без длительности, но живым."""

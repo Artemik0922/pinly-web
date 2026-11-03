@@ -109,13 +109,23 @@ URL_FIELDS = ("sourceUrl", "pageUrl", "authorAvatar", "url")
 ALLOWED_URL_PREFIXES = ("http://", "https://", "/")
 
 
+def _check_url(value) -> None:
+    if value is None:
+        return
+    if not isinstance(value, str) or not value.startswith(ALLOWED_URL_PREFIXES):
+        raise HTTPException(400, "invalid pin_data")
+
+
 def check_url_fields(card: dict) -> None:
     for field in URL_FIELDS:
-        value = card.get(field)
-        if value is None:
-            continue
-        if not isinstance(value, str) or not value.startswith(ALLOWED_URL_PREFIXES):
-            raise HTTPException(400, "invalid pin_data")
+        _check_url(card.get(field))
+    # Носители лежат внутри карточки и доезжают до чужой доски тем же
+    # бороздом, что и обложка: их схемы проверяются точно так же, иначе
+    # снапшот принёс бы javascript: или data: в обход проверки.
+    for slide in card.get("slides") or []:
+        if isinstance(slide, dict):
+            for field in ("url", "posterUrl"):
+                _check_url(slide.get(field))
 
 
 def pin_card_json(card: Any, pin_id: str) -> str:

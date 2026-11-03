@@ -3,6 +3,8 @@
 // Модуль клиент-безопасен: никаких node-импортов — из него собирают URL
 // карточки в браузере.
 
+import { MAX_SLIDES } from "@/lib/upload-limits";
+
 export type Pin = {
   id: string;
   title: string;
@@ -83,7 +85,10 @@ export function pinImageUrl(
  * единственный слайд — обложка, поэтому карточке не нужны две ветки рендера.
  */
 export function pinSlides(pin: Pin): PinSlide[] {
-  if (pin.slides?.length) return pin.slides;
+  // Потолок слайдов сервер проверяет при создании, но доска хранит снапшот
+  // карточки, присланный клиентом: без среза один чужой ответ превратил бы
+  // карточку в ленту из сотни узлов.
+  if (pin.slides?.length) return pin.slides.slice(0, MAX_SLIDES);
   const [w, h] = pinImageSize(pin);
   return [{ kind: "image", url: pinImageUrl(pin), width: w, height: h }];
 }
