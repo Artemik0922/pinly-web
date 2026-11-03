@@ -150,7 +150,10 @@ export function MediaCarousel({
             <div
               key={`${slide.url}-${i}`}
               className="relative h-full w-full shrink-0 snap-center"
+              // Скрытый слайд не должен ни читаться, ни ловить фокус:
+              // aria-hidden без inert оставил бы невидимые кнопки в табуляции.
               aria-hidden={i !== index}
+              inert={i !== index}
             >
               <Media
                 slide={slide}

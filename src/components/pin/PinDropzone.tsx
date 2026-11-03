@@ -73,16 +73,15 @@ export function PinDropzone({
                   <img src={slide.url} alt={`Слайд ${i + 1}`} className="aspect-[4/3] w-full object-cover" />
                 )}
                 <p className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white">
-                  {slide.kind === "video" ? (
-                    <>
-                      <IconPlay size={9} />
-                      {slide.durationMs ? formatMediaDuration(slide.durationMs) : "видео"}
-                    </>
-                  ) : i === 0 ? (
-                    "обложка"
-                  ) : (
-                    `слайд ${i + 1}`
-                  )}
+                  {slide.kind === "video" && <IconPlay size={9} />}
+                  {/* Обложкой становится первый слайд независимо от того,
+                      картинка это или видео: подпись не должна терять «обложку»,
+                      когда мастер ставит ролик первым. */}
+                  {i === 0
+                    ? `обложка${slide.durationMs ? ` · ${formatMediaDuration(slide.durationMs)}` : ""}`
+                    : slide.kind === "video"
+                      ? `видео · ${slide.durationMs ? formatMediaDuration(slide.durationMs) : "без длительности"}`
+                      : `слайд ${i + 1}`}
                 </p>
                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-end">
                   <IconButton label="Переставить влево" onClick={() => onMove(slide.id, -1)} disabled={i === 0}>
