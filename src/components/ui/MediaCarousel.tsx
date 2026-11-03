@@ -206,8 +206,13 @@ export function MediaCarousel({
           {/* Точки: видимая часть — 6 px, зона нажатия — 44, как у всех кнопок
               интерфейса. Без них листание мышью неоткрываемо. Под точками
               лежит полупрозрачная пилюля: на светлой работе мастера белые
-              точки сливались с фоном и индикатор исчезал. */}
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center">
+              точки сливались с фоном и индикатор исчезал. На странице пина
+              пилюля приподнята — ниже неё родная панель перемотки. */}
+          <div
+            className={`absolute inset-x-0 flex items-center justify-center ${
+              variant === "detail" ? "bottom-14" : "bottom-0"
+            }`}
+          >
             <div className="flex items-center rounded-full bg-black/35 px-0.5 py-1">
               {slides.map((slide, i) => (
                 <button
@@ -345,7 +350,10 @@ function Media({
         onError={onBroken}
         onPlay={() => setPaused(false)}
         onPause={() => setPaused(true)}
-        className="h-full w-full bg-black object-cover"
+        // Карточка режет (кадр должен заполнять ячейку), страница пина —
+        // показывает целиком: у вертикального ролика сверху и снизу важная
+        // часть работы, и обрезать её на единственном большом экране нельзя.
+        className={`h-full w-full bg-black ${variant === "detail" ? "object-contain" : "object-cover"}`}
       />
       {variant === "card" && (
         // Кнопка, а не тап по ролику: карточка целиком — ссылка на пин, и жест
