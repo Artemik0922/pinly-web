@@ -16,6 +16,10 @@ export function pinCountLabel(n: number): string {
   return countLabel(n, "пин", "пина", "пинов");
 }
 
+export function slideCountLabel(n: number): string {
+  return countLabel(n, "слайд", "слайда", "слайдов");
+}
+
 // Список досок отдаёт срез пинов (BOARD_PREVIEW_PINS в backend/accounts.py),
 // поэтому число для подписи берём из счётчика, а не из длины среза.
 export function boardPinCount(board: { pins: unknown[]; pinsCount?: number }): number {

@@ -6,10 +6,10 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { sourceLabel, type Pin } from "@/lib/pin";
+import { pinImageSize, pinSlides, sourceLabel, type Pin } from "@/lib/pin";
 import { categoryHref } from "@/lib/categories";
 import { track } from "@/lib/track";
-import { PinImage } from "@/components/feed/PinCard";
+import { MediaCarousel } from "@/components/ui/MediaCarousel";
 import { Avatar } from "@/components/ui/Avatar";
 import { Comments } from "@/components/pin/Comments";
 import { MasonryGrid } from "@/components/ui/MasonryGrid";
@@ -95,7 +95,15 @@ export function PinDetail({ pin, related }: { pin: Pin; related: Pin[] }) {
 
       <section className="mt-4 grid gap-8 rounded-3xl bg-surface-card p-4 sm:p-6 md:grid-cols-2">
         <div className="m-auto w-full">
-          <PinImage pin={pin} preload sizes="(max-width: 768px) 92vw, 45vw" />
+          <MediaCarousel
+            slides={pinSlides(pin)}
+            alt={pin.title}
+            cover={pinImageSize(pin)}
+            variant="detail"
+            preload
+            sizes="(max-width: 768px) 92vw, 45vw"
+            onSlideView={() => track.slideView(pin.id)}
+          />
         </div>
 
         <div className="flex flex-col py-2">

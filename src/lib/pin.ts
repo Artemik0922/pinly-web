@@ -23,6 +23,19 @@ export type Pin = {
   userId?: string; // автор-пользователь (для «это мой пин»)
   authorAvatar?: string | null; // аватар автора из аккаунта
   saves?: number; // счётчик сохранений в доски
+  // Носители пина: слайды, которые перелистывают, и видео. Пусто у внешних
+  // источников и у всего, что создано до этой функции, — тогда карточка
+  // живёт на sourceUrl (см. pinSlides).
+  slides?: PinSlide[];
+};
+
+export type PinSlide = {
+  kind: "image" | "video";
+  url: string;
+  width?: number | null;
+  height?: number | null;
+  durationMs?: number;
+  posterUrl?: string; // у видео: кадр-обложка; без него <video> сам покажет первый
 };
 
 // Пины из чужих рук (содержимое досок, старые записи localStorage) могут
@@ -61,4 +74,30 @@ export function pinImageUrl(
   // Мок: picsum.photos напрямую даёт 403, поэтому через weserv.
   const [w, h] = pinImageSize(pin);
   return `https://images.weserv.nl/?url=picsum.photos/seed/${pin.seed || pin.id}/${w}/${h}&q=80`;
+}
+
+/**
+ * Носители пина в одном виде: всегда хотя бы один слайд.
+ *
+ * У пинов без таблицы носителей (внешние источники, всё созданное раньше)
+ * единственный слайд — обложка, поэтому карточке не нужны две ветки рендера.
+ */
+export function pinSlides(pin: Pin): PinSlide[] {
+  if (pin.slides?.length) return pin.slides;
+  const [w, h] = pinImageSize(pin);
+  return [{ kind: "image", url: pinImageUrl(pin), width: w, height: h }];
+}
+
+export function pinHasVideo(pin: Pin): boolean {
+  return Boolean(pin.slides?.some((slide) => slide.kind === "video"));
+}
+
+/** Понятная длина видео на бейдже: 0:07, 1:05, 1:02:03. */
+export function formatMediaDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const s = total % 60;
+  const m = Math.floor(total / 60) % 60;
+  const h = Math.floor(total / 3600);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }

@@ -34,6 +34,7 @@ from .deps import session_payload
 EVENTS = (
     "visit",
     "pin_view",
+    "slide_view",
     "board_view",
     "board_created",
     "pin_save",

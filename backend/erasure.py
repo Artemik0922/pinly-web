@@ -9,14 +9,17 @@
 
 import sqlite3
 
-from . import accounts, boards, chats, likes, media, notifications, pins, social, uploads
+from . import accounts, boards, chats, likes, media, notifications, pins, slides, social, uploads
 from .db import connection
 
 
 def erase_pin(pin: sqlite3.Row) -> None:
-    """Удалить пин, всё, что на него ссылается, файл картинки и вектор."""
+    """Удалить пин, всё, что на него ссылается, файлы носителей и вектор."""
     pin_id = pin["id"]
     with connection() as conn:
+        # имена слайдов собираем ДО удаления: каскад по pin_slides унесёт
+        # строки, и стирать будет уже нечего
+        slide_names = slides.filenames_of(conn, pin_id)
         boards.remove_pin_rows(conn, pin_id)
         likes.remove_pin_rows(conn, pin_id)
         social.remove_pin_rows(conn, pin_id)
@@ -25,6 +28,8 @@ def erase_pin(pin: sqlite3.Row) -> None:
         pins.remove_row(conn, pin_id)
     # файлы и эмбеддинги — вне транзакции: их не за что откатывать
     pins.forget_files([pin])
+    for name in slide_names:
+        uploads.discard(name)
     pins.forget_vectors([pin_id])
 
 
@@ -39,6 +44,7 @@ def erase_account(user: sqlite3.Row) -> None:
         # собираем артефакты заранее: каскад по users(id) их унесёт
         rows = pins.pins_of_user(conn, user_id)
         filenames = media.file_names_of_user(conn, user_id)
+        slide_names = slides.filenames_of_user(conn, user_id)
         # Доски, пины, лайки, подписки, комментарии, уведомления и участия в
         # чатах уйдут по cascade. Остальное — строковые ссылки без FK, чистим
         # руками: свои лайки под чужими пинами, чужие лайки и комментарии под
@@ -57,4 +63,7 @@ def erase_account(user: sqlite3.Row) -> None:
     pins.forget_files(rows)
     pins.forget_vectors([row["id"] for row in rows])
     for name in filenames:
+        uploads.discard(name)
+    # видео и постеры пинов: строки ушли каскадом, файлы — только руками
+    for name in slide_names:
         uploads.discard(name)

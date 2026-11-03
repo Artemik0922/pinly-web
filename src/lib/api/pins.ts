@@ -4,24 +4,32 @@ import type { Pin } from "@/lib/pin";
 import { requestJson, requestMultipart } from "@/lib/api/http";
 
 export type NewPinForm = {
-  file: File;
+  // носители по порядку: первый станет обложкой. Один файл — обычный пин,
+  // несколько — слайды, среди них может быть видео.
+  files: File[];
+  sizes: { width: number; height: number }[];
   title: string;
   description: string;
   category: string;
   tags: string[];
-  width: number;
-  height: number;
 };
 
 export async function apiCreatePin(form: NewPinForm): Promise<Pin> {
   const fd = new FormData();
-  fd.set("file", form.file);
+  // parts в порядке слайдов: сервер не знает имён полей, он знает порядок
+  for (const file of form.files) {
+    fd.append("files", file, file.name);
+  }
+  fd.set("sizes", JSON.stringify(form.sizes.map((s) => ({ width: s.width, height: s.height }))));
   fd.set("title", form.title);
   fd.set("description", form.description);
   fd.set("category", form.category);
   fd.set("tags", form.tags.join(","));
-  fd.set("width", String(form.width));
-  fd.set("height", String(form.height));
+  const first = form.sizes[0];
+  if (first) {
+    fd.set("width", String(first.width));
+    fd.set("height", String(first.height));
+  }
   return (await requestMultipart<{ pin: Pin }>("/api/pins", fd)).pin;
 }
 

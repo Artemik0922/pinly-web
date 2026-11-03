@@ -16,10 +16,10 @@ import uuid
 
 from fastapi import HTTPException
 
-from . import accounts, boards, likes, uploads
+from . import accounts, boards, likes, slides, uploads, video
 from .db import connection
 from .embeddings import embed_texts, embeddings_enabled, store as vector_store
-from .images import detect_image_ext, is_allowed_img_host
+from .images import is_allowed_img_host
 from .schemas import PinFromUrlBody, PinUpdateBody
 
 
@@ -44,6 +44,7 @@ def build_cards(conn: sqlite3.Connection, rows: list[sqlite3.Row]) -> list[dict]
     users = accounts.users_by_ids(conn, sorted({row["user_id"] for row in rows}))
     like_counts = likes.count_map(conn, pin_ids)
     save_counts = boards.save_count_map(conn, pin_ids)
+    slides_map = slides.json_map(conn, pin_ids)
 
     result: list[dict] = []
     for row in rows:
@@ -73,6 +74,9 @@ def build_cards(conn: sqlite3.Connection, rows: list[sqlite3.Row]) -> list[dict]
                 "likes": like_counts[row["id"]],
                 "saves": save_counts[row["id"]],
                 "sourceUrl": source,
+                # пустой массив = пин без носителей (внешний, созданный до
+                # функции слайдов): клиент тогда живёт на sourceUrl
+                "slides": slides_map.get(row["id"], []),
             }
         )
     return result
@@ -155,33 +159,54 @@ def clean_tags(raw: str) -> list[str]:
     return [t for t in tags if t][:8]
 
 
-def create(
+def create_media(
     user_id: str,
-    content: bytes,
+    names: list[str],
+    sizes: list[dict] | None,
     title: str,
     description: str,
     category: str,
     tags: str,
-    width: int,
-    height: int,
 ) -> dict:
-    """Загрузить картинку и завести пин.
+    """Завести пин из уже сохранённых файлов: один — обычный, несколько —
+    перелистываемые слайды, и среди них может быть видео.
 
-    Тип берём из содержимого: имя файла и Content-Type присылает клиент, и без
-    проверки под видом .jpg можно выложить то, что браузер исполнит с нашего
-    домена.
+    Тип каждого файла уже определён по сигнатуре байтов (это делает сохранение),
+    поэтому «видео» здесь — факт о содержимом, а не о том, что прислал браузер.
+    Для видео добавляются два серверных артефакта: размеры и длительность из
+    ffprobe и постер из ffmpeg — обложка пина обязана оставаться картинкой,
+    иначе og:image, сетка и превью в мессенджере видят пустоту.
     """
-    if len(content) > uploads.MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "file too large (max 10 MB)")
-    if not content:
-        raise HTTPException(400, "empty file")
-    ext = detect_image_ext(content)
-    if ext is None:
-        raise HTTPException(400, "unsupported file type (jpg/png/webp)")
+    if not names:
+        raise HTTPException(400, "file required")
+    if len(names) > uploads.MAX_SLIDES_PER_PIN:
+        raise HTTPException(400, f"too many slides (max {uploads.MAX_SLIDES_PER_PIN})")
+
+    items: list[dict] = []
+    for index, name in enumerate(names):
+        declared = (sizes or [])[index] if sizes and index < len(sizes) else {}
+        item = {
+            "kind": "video" if uploads.is_video(name) else "image",
+            "file": name,
+            "width": int(declared.get("width") or 0),
+            "height": int(declared.get("height") or 0),
+            "durationMs": 0,
+            "poster": "",
+        }
+        if item["kind"] == "video":
+            probed = video.probe(name)
+            item["width"] = probed.get("width") or item["width"]
+            item["height"] = probed.get("height") or item["height"]
+            item["durationMs"] = probed.get("durationMs") or 0
+            item["poster"] = video.make_poster(name) or ""
+        items.append(item)
+
+    cover = items[0]
+    # обложка — картинка: у видео это постер, а если ffmpeg на машине нет, то
+    # сам файл; карточка тогда всё равно берёт кадр из slides[0]
+    cover_file = cover["poster"] or cover["file"]
 
     pin_id = f"up-{uuid.uuid4().hex}"
-    filename = f"{pin_id[3:]}.{ext}"
-    uploads.write(filename, content)
     now = time.time()
     with connection() as conn:
         conn.execute(
@@ -194,12 +219,13 @@ def create(
                 description.strip()[:2000],
                 category.strip()[:40],
                 json.dumps(clean_tags(tags), ensure_ascii=False),
-                max(1, min(width, 20000)),
-                max(1, min(height, 20000)),
-                filename,
+                max(1, min(cover["width"] or 800, 20000)),
+                max(1, min(cover["height"] or 1200, 20000)),
+                cover_file,
                 now,
             ),
         )
+        slides.add(conn, pin_id, items)
         row = row_by_id(conn, pin_id)
         pin = pin_json(conn, row)
     return pin
@@ -286,6 +312,15 @@ def forget_files(rows: list[sqlite3.Row]) -> None:
         name = upload_name(row)
         if name:
             uploads.discard(name)
+
+
+def slide_files(pin_ids: list[str]) -> list[str]:
+    """Файлы носителей: видео и постеры. Собирать ДО удаления строк пина —
+    после каскада по pin_slides перечислять будет нечего."""
+    if not pin_ids:
+        return []
+    with connection() as conn:
+        return [name for pin_id in pin_ids for name in slides.filenames_of(conn, pin_id)]
 
 
 def forget_vectors(pin_ids: list[str]) -> None:

@@ -14,10 +14,8 @@ import { isStatus } from "@/lib/api/http";
 import { useBoards } from "@/lib/state/boards";
 import { useUser } from "@/lib/state/session";
 import { PinDropzone } from "@/components/pin/PinDropzone";
-import { usePinImage } from "@/components/pin/usePinImage";
-import { MAX_UPLOAD_MB } from "@/lib/upload-limits";
-
-const MAX_FILE_MB = MAX_UPLOAD_MB;
+import { usePinMedia } from "@/components/pin/usePinMedia";
+import { MAX_UPLOAD_MB, MAX_VIDEO_MB } from "@/lib/upload-limits";
 
 export default function NewPinPage() {
   return (
@@ -41,7 +39,7 @@ function NewPinInner() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const { image, pickFile, attachMedia, reset } = usePinImage(MAX_FILE_MB, setError);
+  const { slides, addFiles, attachMedia, removeAt, move, clear } = usePinMedia(setError);
 
   // Возврат назад после публикации: браузер восстанавливает страницу из
   // bfcache вместе с залипшим «Публикуем…» — сбрасываем состояние формы
@@ -49,11 +47,11 @@ function NewPinInner() {
     const onShow = (e: PageTransitionEvent) => {
       if (!e.persisted) return;
       setBusy(false);
-      reset();
+      clear();
     };
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
-  }, [reset]);
+  }, [clear]);
 
   // Предзаполнение из медиатеки: /pin/new?media=<id>. Один раз на id: иначе
   // каждое обновление страницы перезаписывало бы уже отредактированный черновик.
@@ -101,8 +99,14 @@ function NewPinInner() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!image) {
-      setError("Выберите картинку");
+    if (!slides.length) {
+      setError("Выберите картинку или видео");
+      return;
+    }
+    if (slides.some((slide) => !slide.width || !slide.height)) {
+      // размеры читает браузер; публиковать вслепую — значит угадать пропорцию
+      // и получить кривую ячейку в сетке
+      setError("Файлы ещё читаются — пройдёт секунду.");
       return;
     }
     setBusy(true);
@@ -116,12 +120,23 @@ function NewPinInner() {
           .split(",")
           .map((t) => t.trim())
           .filter(Boolean),
-        width: image.width,
-        height: image.height,
       };
-      const published = image.file
-        ? await apiCreatePin({ file: image.file, ...common })
-        : await apiCreatePinFromUrl({ sourceUrl: image.sourceUrl ?? "", ...common });
+      const [cover] = slides;
+      const published =
+        slides.length === 1 && !cover.file
+          ? await apiCreatePinFromUrl({
+              sourceUrl: cover.sourceUrl ?? "",
+              width: cover.width,
+              height: cover.height,
+              ...common,
+            })
+          : await apiCreatePin({
+              files: slides
+                .map((slide) => slide.file)
+                .filter((file): file is File => Boolean(file)),
+              sizes: slides.map((slide) => ({ width: slide.width, height: slide.height })),
+              ...common,
+            });
       if (boardId) togglePin(boardId, published);
       router.push(`/pin/${published.id}`);
       router.refresh();
@@ -131,7 +146,7 @@ function NewPinInner() {
         isStatus(err, 401)
           ? "Сессия истекла — войдите заново."
           : isStatus(err, 413)
-            ? `Файл больше ${MAX_FILE_MB} МБ.`
+            ? `Картинка больше ${MAX_UPLOAD_MB} МБ, видео больше ${MAX_VIDEO_MB} МБ.`
             : "Не удалось загрузить пин. Проверьте, что бэкенд запущен.",
       );
     }
@@ -145,7 +160,7 @@ function NewPinInner() {
         onSubmit={submit}
         className="mt-8 grid gap-6 rounded-3xl bg-surface-card p-4 sm:p-6 md:grid-cols-2"
       >
-        <PinDropzone maxFileMb={MAX_FILE_MB} image={image} onPick={pickFile} />
+        <PinDropzone slides={slides} onPick={addFiles} onRemove={removeAt} onMove={move} />
 
         <div className="flex flex-col gap-3">
           <input

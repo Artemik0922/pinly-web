@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
 // Три сценария, которые дороже всего ломать: лента, новый аккаунт с
@@ -665,4 +666,110 @@ test("поиск по фото ограничили по частоте: он п
   }
   expect(statuses).toContain(429);
   expect(statuses[statuses.length - 1]).toBe(429);
+});
+
+// ── видео и слайды ──────────────────────────────────────────────────────
+
+const CLIP = readFileSync("e2e/fixtures/clip.mp4");
+
+test("пин с видео и слайдами листается и не ломает сетку", async ({ page }) => {
+  // Сценарий мастера: снять украшение в движении, добавить чертёж вторым
+  // слайдом и отправить это в ленту. Проверяем и серверную часть (обложка,
+  // постер, витрина без JS), и перелистывание пальцем, мышью и клавиатурой —
+  // через форму, как это делает человек.
+  //
+  // request-фикстура здесь не годится: у неё свой cookie-джар, и страница
+  // создания пина не пустила бы анонима. page.request — та же сессия, что у
+  // браузера.
+  const email = `slides-${stamp}@example.test`;
+  const registered = await page.request.post("/api/auth/register", {
+    data: { email, password: "secret12345", consent: true, display_name: "Мастер слайдов" },
+  });
+  expect(registered.ok()).toBe(true);
+
+  await page.goto("/pin/new");
+  await page.setInputFiles('input[type="file"]', [
+    { name: "cover.png", mimeType: "image/png", buffer: TINY_PNG },
+    { name: "clip.mp4", mimeType: "video/mp4", buffer: CLIP },
+  ]);
+  await expect(page.getByText("2 слайда — листать свайпом или точками")).toBeVisible();
+  // длительность приезжает из метаданных файла: без неё форма публиковала бы
+  // пин, ещё не зная пропорций второго слайда
+  await expect(page.getByText("0:01")).toBeVisible();
+  await page.getByPlaceholder("Название").fill("Слайд-шоу с видео");
+  await page.getByRole("button", { name: "Опубликовать" }).click();
+  await expect(page).toHaveURL(/\/pin\/up-[a-f0-9]{32}$/);
+  const pinId = page.url().split("/").pop() as string;
+
+  // Мессенджеру нужна картинка: обложкой видеопина остаётся постер или первый
+  // слайд, но никогда не сам .mp4 — боты его не показывают.
+  const html = await (await page.request.get(`/pin/${pinId}`)).text();
+  const og = html.match(/property="og:image" content="([^"]+)"/)?.[1] ?? "";
+  expect(og, "og:image видеопина пропал").toMatch(/\.png$/);
+  expect(og).not.toMatch(/\.mp4/);
+
+  // Страница пина: перемотка и звук принадлежат человеку, открывшему работу.
+  await page.goto(`/pin/${pinId}`);
+  // первый group на странице — сам пин; ниже лежит сетка «похожие пины», и
+  // один из них — этот же пин по категории, поэтому .first(), а не unique
+  const carousel = page.getByRole("group", { name: "Слайды: Слайд-шоу с видео" }).first();
+  await expect(carousel).toBeVisible();
+  const video = carousel.locator("video");
+  await expect(video).toHaveCount(1);
+  await expect(video).toHaveAttribute("src", /\/api\/uploads\/[a-f0-9]{32}\.mp4/);
+  await expect(video).toHaveJSProperty("controls", true);
+
+  // Постер снят сервером и раздаётся как картинка с диапазонами — то же самое
+  // плеер попросит у самого видео, и без Range перемотка не работает.
+  const poster = await video.getAttribute("poster");
+  expect(poster, "у видео нет постера — витрине нечего показывать до нажатия").toMatch(
+    /\/api\/uploads\/[a-f0-9]{32}\.jpg/,
+  );
+  const posterResponse = await page.request.get(poster as string);
+  expect(posterResponse.status()).toBe(200);
+  expect(posterResponse.headers()["content-type"]).toBe("image/jpeg");
+  const sliced = await page.request.get(poster as string, { headers: { Range: "bytes=0-99" } });
+  expect(sliced.status()).toBe(206);
+  expect(sliced.headers()["content-range"]).toMatch(/^bytes 0-99\/\d+$/);
+
+  await page.getByRole("button", { name: "Следующий слайд" }).click();
+  await expect(page.getByText("2/2")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Следующий слайд" })).toBeDisabled();
+  await expect(carousel.getByRole("button", { name: "Слайд 2 из 2" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+
+  // Точка — тоже управление: листать должны и те, кто не попал по стрелке.
+  await carousel.getByRole("button", { name: "Слайд 1 из 2" }).click();
+  await expect(page.getByText("1/2")).toBeVisible();
+
+  // Клавиатура: карусель в фокусе, стрелки работают без мыши.
+  await carousel.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("2/2")).toBeVisible();
+
+  // Карточка в ленте: тихо и по кругу, и высота ячейки не двигается от того,
+  // что второй слайд другой пропорции — иначе masonry перетекает на листании.
+  await page.goto("/");
+  const card = page.getByRole("group", { name: "Слайды: Слайд-шоу с видео" }).first();
+  await expect(card).toBeVisible();
+  const cardVideo = card.locator("video");
+  await expect(cardVideo).toHaveJSProperty("muted", true);
+  await expect(cardVideo).toHaveJSProperty("controls", false);
+  // бейдж с длительностью появляется только если durationMs приехал с сервера
+  // (ffprobe), а не из браузера: на карточке другого источника числа нет
+  await expect(card.getByText("0:01")).toBeVisible();
+  const before = await card.boundingBox();
+  await card.getByRole("button", { name: "Слайд 2 из 2" }).click();
+  const after = await card.boundingBox();
+  // Hover-увеличение карточки меняет и ширину, и высоту — сравниваем пропорцию:
+  // обложка 1×1 задала квадрат, и второй слайд другой пропорции её не двигает.
+  expect((after?.width ?? 0) / (after?.height ?? 1)).toBeCloseTo(
+    (before?.width ?? 0) / (before?.height ?? 1),
+    2,
+  );
+  // и сам ролик влезает в ту же ячейку: сетка на листании не перетекает
+  const videoBox = await cardVideo.boundingBox();
+  expect(videoBox?.height ?? 0).toBeCloseTo(after?.height ?? 0, -1);
 });

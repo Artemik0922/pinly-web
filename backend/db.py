@@ -69,6 +69,19 @@ create table if not exists pins (
 );
 create index if not exists pins_user_idx on pins (user_id, created_at desc);
 create index if not exists pins_category_idx on pins (category, created_at desc);
+create table if not exists pin_slides (
+  id          text primary key,
+  pin_id      text not null references pins(id) on delete cascade,
+  position    integer not null,
+  kind        text not null,
+  file        text not null default '',
+  width       integer not null default 0,
+  height      integer not null default 0,
+  duration_ms integer not null default 0,
+  poster      text not null default '',
+  unique (pin_id, position)
+);
+create index if not exists pin_slides_pin_idx on pin_slides (pin_id, position);
 create table if not exists media (
   id         text primary key,
   user_id    text not null references users(id) on delete cascade,

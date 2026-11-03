@@ -1,4 +1,4 @@
-# Разбор картинок по сигнатуре (магическим байтам), а не по имени файла.
+# Разбор картинок и видео по сигнатуре (магическим байтам), а не по имени файла.
 # Имя файла и Content-Type, присланные браузером, ничего не гарантируют:
 # без проверки под видом .png можно сохранить HTML или SVG, который затем
 # отдаётся с нашего домена.
@@ -10,6 +10,9 @@ FETCHER_USER_AGENT = "Pinly demo image fetcher / contact: pinly@test.local"
 JPEG = b"\xff\xd8\xff"
 PNG = b"\x89PNG\r\n\x1a\n"
 WEBP = b"RIFF"
+FTYP = b"ftyp"
+QUICKTIME_BRAND = b"qt  "
+EBML = b"\x1a\x45\xdf\xa3"
 
 
 def detect_image_ext(data: bytes) -> str | None:
@@ -25,6 +28,29 @@ def detect_image_ext(data: bytes) -> str | None:
     if data.startswith(WEBP) and data[8:12] == b"WEBP":
         return "webp"
     return None
+
+
+def detect_media_ext(data: bytes) -> str | None:
+    """Расширение картинки ИЛИ видео: jpg|png|webp|mp4|webm|mov|None.
+
+    MP4 и MOV — один контейнер ISO BMFF, различаются brand на позиции 8:
+    телефонная «.mov» попадёт к нам как mov, и браузер её не покажет, но
+    тип по байтам честнее, чем доверять расширению из формы. WebM и Matroska
+    делят заголовок EBML: различить их по заголовку невозможно, поэтому берём
+    webm — худшее, что случится, это «браузер не поддерживает» на карточке.
+    """
+    image = detect_image_ext(data)
+    if image:
+        return image
+    if len(data) >= 12 and data[4:8] == FTYP:
+        return "mov" if data[8:12] == QUICKTIME_BRAND else "mp4"
+    if data.startswith(EBML):
+        return "webm"
+    return None
+
+
+def is_video_ext(ext: str) -> bool:
+    return ext in ("mp4", "webm", "mov")
 
 
 # Прокси картинок отдаёт только эти хосты (и их поддомены). Точный матч

@@ -59,6 +59,7 @@ Python-бэкенде на SQLite, оптимизацией картинок з�
 | **Лента** | масонри-сетка, инфинити-скролл, ротация категорий, вкладка «Подписки» | [`src/components/ui/MasonryGrid.tsx`](src/components/ui/MasonryGrid.tsx), [`src/lib/server/feed.ts`](src/lib/server/feed.ts) |
 | **Пины** | страница с похожими, лайк, скачивание, «поделиться», комментарии, теги и автор; с чужого пина можно пожаловаться | [`src/components/pin/PinDetail.tsx`](src/components/pin/PinDetail.tsx), [`src/components/report/ReportButton.tsx`](src/components/report/ReportButton.tsx) |
 | **Свои загрузки** | drag&drop, тип файла по сигнатуре, имя файла генерирует сервер; опционально внешний хостинг | [`backend/routers/pins.py`](backend/routers/pins.py), [`backend/pins.py`](backend/pins.py) |
+| **Видео и слайды** | в пине до 8 носителей, их листают свайпом, точками, стрелками и с клавиатуры; видео играет в ленте без звука, а на своей странице — с перемоткой. Длительность и размеры снимает `ffprobe`, обложку кадрит `ffmpeg` — `og:image`, доска и сетка продолжают видеть обычную картинку | [`src/components/ui/MediaCarousel.tsx`](src/components/ui/MediaCarousel.tsx), [`backend/slides.py`](backend/slides.py), [`backend/video.py`](backend/video.py) |
 | **Доски** | создание, переименование, удаление, коллажи-превью, секретные доски, публичная ссылка, по которой доску видят чужие | [`src/components/board/BoardView.tsx`](src/components/board/BoardView.tsx) |
 | **Аккаунты** | регистрация, сессия httpOnly-cookie, аватар, удаление аккаунта с каскадом по всем данным | [`backend/accounts.py`](backend/accounts.py) |
 | **Соцблок** | подписки, публичные профили и доски, комментарии, уведомления о лайке, комментарии и подписке | [`backend/routers/social.py`](backend/routers/social.py), [`backend/notifications.py`](backend/notifications.py) |
@@ -72,7 +73,7 @@ Python-бэкенде на SQLite, оптимизацией картинок з�
 | `/` | лента с фильтром по категориям (`/?category=…`) и вкладкой подписок (`/?feed=subscriptions`) |
 | `/category/[slug]` | посадочная страница категории: свой `title`, `h1`, вступление и `canonical`. Именно её отдаю поисковику и кладу в sitemap |
 | `/pin/[id]` | пин: описание, автор, теги, похожие, лайк, скачивание, комментарии, структурированные данные |
-| `/pin/new` | загрузка своей картинки с сразу выбранной доской |
+| `/pin/new` | загрузка своих носителей: до 8 слайдов (картинки и видео), их порядок правят стрелками, первый становится обложкой; доска выбирается сразу |
 | `/search?q=…` | поиск по тексту, закрыт от индекса |
 | `/search?by=image` | поиск по фото: меню источников — «Камера»/«Галерея» на телефоне, веб-камера, файл и буфер на ПК; можно перетащить или вставить через Ctrl+V |
 | `/boards`, `/board/[id]` | список досок и одна доска; чужая открытая — просмотр и сигнал о проблеме |

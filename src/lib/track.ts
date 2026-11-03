@@ -48,6 +48,10 @@ export const track = {
   pinSave: (pin: string, board: string, category?: string) =>
     send("pin_save", { pin, board, category }),
   shareCopy: (board: string) => send("share_copy", { board }),
+  // Слайд дочитан до конца — листание произошло. Номер слайда едет в source:
+  // отдельной колонки нет, а для board_view source — канал перехода; здесь же
+  // это просто «который по счёту», и сводка его не суммирует.
+  slideView: (pin: string, slide = 1) => send("slide_view", { pin, source: String(slide) }),
   // Жалоба на контент. Причина едет в source: отдельной колонки (и таблицы
   // модерации) нет, а канал перехода считается только по board_view.
   report: (target: { pin?: string; board?: string }, reason: string) =>

@@ -6,7 +6,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { memo, useState } from "react";
-import { pinImageSize, pinImageUrl, type Pin } from "@/lib/pin";
+import { pinImageSize, pinImageUrl, pinSlides, type Pin } from "@/lib/pin";
+import { MediaCarousel } from "@/components/ui/MediaCarousel";
 import { SaveControls } from "@/components/pin/SaveControls";
 
 // Пропорции карточек в masonry: 2 колонки на мобильном → 5 на широком экране.
@@ -104,7 +105,17 @@ export const PinCard = memo(function PinCard({
       >
         <div className="overflow-hidden rounded-2xl shadow-card transition-shadow duration-200 group-hover:shadow-overlay">
           <div className="transition-transform duration-200 ease-pop group-hover:scale-[1.02]">
-            <PinImage pin={pin} priority={priority} preload={preload} onError={() => setFailed(true)} />
+            {/* Носители пина: одна обложка — как раньше, несколько слайдов —
+                листаются свайпом, точками и стрелками, видео играет тихо. */}
+            <MediaCarousel
+              slides={pinSlides(pin)}
+              alt={pin.title}
+              cover={pinImageSize(pin)}
+              sizes={CARD_SIZES}
+              priority={priority}
+              preload={preload}
+              onError={() => setFailed(true)}
+            />
           </div>
         </div>
       </Link>

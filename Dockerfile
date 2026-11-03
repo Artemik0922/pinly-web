@@ -10,8 +10,11 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
+# ffmpeg нужен видеозагрузкам: ffprobe снимает длительность и размеры кадра,
+# ffmpeg кадрирует постер — без него обложкой ролика становится сам .mp4, и
+# превью в мессенджере остаётся пустым.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv tini \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv tini ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

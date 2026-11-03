@@ -267,6 +267,32 @@ export function IconUser({ size = 20, className }: IconProps) {
   );
 }
 
+// Стрелки карусели: листать слайды должны и те, кто пользуется мышью или
+// клавиатурой, а не только пальцем.
+export function IconChevronLeft({ size = 16, className }: IconProps) {
+  return (
+    <svg {...base(size, className)}>
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+export function IconChevronRight({ size = 16, className }: IconProps) {
+  return (
+    <svg {...base(size, className)}>
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+export function IconPlay({ size = 16, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M8 5.5v13l11-6.5z" />
+    </svg>
+  );
+}
+
 // Летучая мышь — иконка "bat" Delapouite из набора game-icons (CC BY 3.0),
 // https://game-icons.net/1x1/delapouite/bat.html. Заливка вместо обводки:
 // силуэт с расправленными крыльями обводкой не читается.
