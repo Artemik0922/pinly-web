@@ -368,7 +368,18 @@ test("браузер считает визит и приход на доску �
   const summary = await (await page.request.get("/api/ev/summary?days=1")).json();
   expect(summary.events.some((e: { name: string }) => e.name === "visit")).toBe(true);
   expect(summary.events.some((e: { name: string }) => e.name === "board_created")).toBe(true);
-  expect(summary.boardViewSources.some((s: { source: string }) => s.source === "vk")).toBe(true);
+  // канал перехода ждём отдельно: «Поделиться» приезжает с сервера, а beacon
+  // с ?from=vk отправляется только после гидрации — прочитать сводку сразу
+  // означало бы спорить с сетью, а не проверять продукт
+  await expect
+    .poll(
+      async () => {
+        const s = await (await page.request.get("/api/ev/summary?days=1")).json();
+        return s.boardViewSources.some((v: { source: string }) => v.source === "vk");
+      },
+      { timeout: 30_000, message: "board_view с ?from=vk не долетел до сводки" },
+    )
+    .toBe(true);
 });
 
 test("у категории есть постоянный адрес для поиска", async ({ page, request }) => {

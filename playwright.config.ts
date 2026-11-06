@@ -5,6 +5,9 @@ import { defineConfig } from "@playwright/test";
 // локально — `python -m uvicorn backend.app:app --port 8000` + этот конфиг.
 export default defineConfig({
   testDir: "./e2e",
+  // Маршруты греются до первого теста — иначе холодная компиляция dev-сервера
+  // съедает бюджет навигации сразу после регистрации.
+  globalSetup: require.resolve("./e2e/global-setup"),
   timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,
