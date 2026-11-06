@@ -4,6 +4,7 @@ import { BoardsProvider } from "@/lib/state/boards";
 import { LikesProvider } from "@/lib/state/likes";
 import { UserProvider } from "@/lib/state/session";
 import { ToastProvider } from "@/components/ui/Toast";
+import { HydrationSignal } from "@/components/ui/HydrationSignal";
 import { Header } from "@/components/layout/Header";
 import { Splash } from "@/components/layout/Splash";
 import { SITE_URL } from "@/lib/site";
@@ -97,6 +98,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <main id="content" className="pb-16">
                   {children}
                 </main>
+                <HydrationSignal />
               </LikesProvider>
             </BoardsProvider>
           </UserProvider>

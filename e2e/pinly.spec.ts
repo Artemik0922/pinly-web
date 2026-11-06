@@ -1,14 +1,36 @@
 import { readFileSync } from "node:fs";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 // Три сценария, которые дороже всего ломать: лента, новый аккаунт с
 // секретной доской и комментарий под пином. Всё — через интерфейс, как
 // это делает человек; бэкенд при этом настоящий.
 
+/**
+ * Открыть страницу и дождаться гидрации.
+ *
+ * Сервер рисует кнопку сразу, и Playwright считает её кликабельной, а
+ * слушателя ещё нет: клик до гидрации — тихий no-op. На холодной сборке
+ * dev-сервера (то есть в CI, где каждый прогон начинает с нуля) так падал
+ * «превью доски»: меню не открылось, тест ждал пункт списка минуту и
+ * вываливался в «element not found» вместо внятной причины.
+ *
+ * Флаг ставим сами (src/components/ui/HydrationSignal.tsx): внутренний
+ * `window.__NEXT_HYDRATED` существует только в сборке с `__NEXT_TEST_MODE`,
+ * а такой сборки мы не делаем — ожидание него истекло бы на каждом шаге.
+ *
+ * reload() специально не трогает: часть проверок смотрит на состояние до
+ * гидрации (заставка, серверный HTML), и ждать её там — значит врать над
+ * проверяемым.
+ */
+const open = async (page: Page, url: string, options?: Parameters<Page["goto"]>[1]) => {
+  await page.goto(url, options);
+  await page.waitForFunction(() => window.__PINLY_HYDRATED === true, null, { timeout: 30_000 });
+};
+
 const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
 test("лента открывается и показывает пины", async ({ page }) => {
-  await page.goto("/");
+  await open(page, "/");
   await expect(page.getByRole("heading", { level: 1, name: /Лента идей/ })).toBeVisible();
   // карточки — ссылки на страницы пинов; ждём хотя бы первую
   await expect(page.locator('main a[href^="/pin/"]').first()).toBeVisible();
@@ -28,7 +50,7 @@ test("лента открывается и показывает пины", async
 });
 
 test("заставка показывается один раз за сессию и не запирает скролл", async ({ page }) => {
-  await page.goto("/");
+  await open(page, "/");
   await expect(page.locator('main a[href^="/pin/"]').first()).toBeVisible();
   // в первый заход экран был (любая из фаз — on уже мог смениться hidden)
   expect(["on", "burst", "hidden"]).toContain(
@@ -44,7 +66,7 @@ test("заставка показывается один раз за сесси�
 
 test("регистрация, секретная доска и комментарий", async ({ page }) => {
   // 1. новый аккаунт
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Тестовый Смоук");
   await page.getByLabel("Email", { exact: true }).fill(`smoke${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -64,7 +86,7 @@ test("регистрация, секретная доска и коммента�
   // 3. комментарий под пином
   // domcontentloaded: карточки тянут картинки с внешнего хоста, и на медленной
   // сети событие load может не дойти до нас вовсе
-  await page.goto("/pin/pin-1", { waitUntil: "domcontentloaded" });
+  await open(page, "/pin/pin-1", { waitUntil: "domcontentloaded" });
   const box = page.getByPlaceholder("Добавьте комментарий…");
   await box.fill(`Смоук-комментарий ${stamp}`);
   // exact: на странице пина есть и кнопка «Отправить в сообщении» (чат),
@@ -93,7 +115,7 @@ test("доска, созданная во время загрузки списк
     return route.fulfill({ response });
   });
 
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Гонка Смоук");
   await page.getByLabel("Email", { exact: true }).fill(`race${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -114,7 +136,7 @@ test("доска, созданная во время загрузки списк
 });
 
 test("поиск отвечает заголовком и результатами", async ({ page }) => {
-  await page.goto(`/search?q=${encodeURIComponent("кухня")}`);
+  await open(page, `/search?q=${encodeURIComponent("кухня")}`);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Поиск");
   // поиск либо находит пины, либо честно сообщает, что ничего нет
   await expect(
@@ -164,7 +186,7 @@ test("выдача поиска листается курсором, а не о�
   });
 
   const cards = page.locator(`main a[href^="/pin/srch${stamp}"]`);
-  await page.goto(`/search?q=${encodeURIComponent("кухня")}`);
+  await open(page, `/search?q=${encodeURIComponent("кухня")}`);
   // Двух карточек на экран мало, сентинел остаётся видимым — вторая страница
   // приходит сама. Поэтому ждём финал, а не промежуток между запросами.
   await expect(cards).toHaveCount(4, { timeout: 20_000 });
@@ -190,7 +212,7 @@ test("доска отдаёт превью для мессенджера и кн
     route.fulfill({ status: 200, contentType: "image/png", body: TINY_PNG }),
   );
 
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Мастер Смоук");
   await page.getByLabel("Email", { exact: true }).fill(`share${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -209,9 +231,11 @@ test("доска отдаёт превью для мессенджера и кн
 
   // domcontentloaded: карточки тянут картинки с внешнего хоста, и на медленной
   // сети событие load может не дойти до нас вовсе
-  await page.goto("/pin/pin-1", { waitUntil: "domcontentloaded" });
+  await open(page, "/pin/pin-1", { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: /^Доска для сохранения/ }).first().click();
-  await page.getByRole("menuitemcheckbox", { name: title }).click();
+  const boardItem = page.getByRole("menuitemcheckbox", { name: title });
+  await expect(boardItem, "меню досок не открылось или список досок не доехал").toBeVisible();
+  await boardItem.click();
   await expect(page.getByRole("button", { name: "Сохранено" })).toBeVisible();
 
   // og:image читаем из серверного HTML: боты мессенджеров cookies не носят.
@@ -242,7 +266,7 @@ test("доска отдаёт превью для мессенджера и кн
   // смотрит, а не прятать их на странице отдельного пина
   expect(html).toContain("Источники");
 
-  await page.goto(boardPath);
+  await open(page, boardPath);
   await expect(page.getByRole("button", { name: "Поделиться" })).toBeVisible({ timeout: 40_000 });
   // сама карточка может быть ещё не видима (картинка едет через прокси),
   // но доска обязана показывать, что работа в ней одна
@@ -275,7 +299,7 @@ test("профиль мастера приезжает витриной, а не
   const name = `Мастер Витрина ${stamp}`;
   const title = `Портфолио витрины ${stamp}`;
 
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill(name);
   await page.getByLabel("Email", { exact: true }).fill(`profile${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -310,7 +334,7 @@ test("профиль мастера приезжает витриной, а не
 
   // Свой профиль остаётся приватным взглядом: витрина с кнопкой «Подписаться»
   // вместо редактора была бы прямым обманом.
-  await page.goto(`/profile/${uid}`);
+  await open(page, `/profile/${uid}`);
   await expect(page.getByRole("button", { name: "Редактировать профиль" })).toBeVisible({
     timeout: 40_000,
   });
@@ -322,7 +346,7 @@ test("браузер считает визит и приход на доску �
   // цифры в сводке означают только curl-проверки, а не поведение людей.
   const title = `Счётчик ${stamp}`;
 
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Счётчик Смоук");
   await page.getByLabel("Email", { exact: true }).fill(`track${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -337,7 +361,7 @@ test("браузер считает визит и приход на доску �
 
   // переход «как из чата»: ссылка с меткой источника
   const boardPath = (await link.getAttribute("href"))!;
-  await page.goto(`${boardPath}?from=vk`);
+  await open(page, `${boardPath}?from=vk`);
   await expect(page.getByRole("button", { name: "Поделиться" })).toBeVisible({ timeout: 40_000 });
 
   // сводка под замком: нужен page.request, он разделит cookie со страницей
@@ -368,7 +392,7 @@ test("у категории есть постоянный адрес для по
   expect(new URL(queryCanonical!).pathname).toBe("/category/recepty");
 
   // чипс над лентой ведут на чистые адреса
-  await page.goto("/category/recepty", { waitUntil: "domcontentloaded" });
+  await open(page, "/category/recepty", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("link", { name: "Интерьер" })).toHaveAttribute(
     "href",
     "/category/interior",
@@ -388,7 +412,7 @@ test("мастер видит цифры своей доски", async ({ page, 
   // сайта в сводке.
   const title = `Цифры ${stamp}`;
 
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Мастер Цифр");
   await page.getByLabel("Email", { exact: true }).fill(`stats${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -401,7 +425,7 @@ test("мастер видит цифры своей доски", async ({ page, 
   const link = page.locator('main a[href^="/board/"]').filter({ hasText: title });
   await expect(link).toHaveAttribute("href", /^\/board\/[0-9a-f-]{36}$/);
 
-  await page.goto((await link.getAttribute("href"))!, { waitUntil: "domcontentloaded" });
+  await open(page, (await link.getAttribute("href"))!, { waitUntil: "domcontentloaded" });
   const panel = page.getByText("Цифры доски");
   await expect(panel).toBeVisible({ timeout: 40_000 });
   await panel.click();
@@ -430,7 +454,7 @@ test("заголовок пина не разрывает блок структ�
     "base64",
   );
 
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Тихон Эксплоит");
   await page.getByLabel("Email", { exact: true }).fill(`xss${Date.now()}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -438,7 +462,7 @@ test("заголовок пина не разрывает блок структ�
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await expect(page).toHaveURL("/boards?welcome=1");  // после регистрации — к своим доскам
 
-  await page.goto("/pin/new");
+  await open(page, "/pin/new");
   await page.setInputFiles('input[type="file"]', { name: "x.png", mimeType: "image/png", buffer: png });
   await page.getByPlaceholder("Название").fill(payload);
   await page.getByRole("button", { name: "Опубликовать" }).click();
@@ -519,7 +543,7 @@ test("лента не отдаёт моки поисковику", async ({ requ
 test("после регистрации видно, что делать со своими досками", async ({ page }) => {
   // Гипотеза «Кабинет мастера» начинается здесь: человек должен увидеть, что у
   // него уже есть доски и что ссылкой на них делятся с заказчиком.
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Новый Мастер");
   await page.getByLabel("Email", { exact: true }).fill(`welcome${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -544,7 +568,7 @@ test("показ пина и сохранение в доску долетают
     if (r.url().includes("/api/ev?")) sent.push(new URL(r.url()).search);
   });
 
-  await page.goto("/pin/pin-1", { waitUntil: "domcontentloaded" });
+  await open(page, "/pin/pin-1", { waitUntil: "domcontentloaded" });
   await expect.poll(() => sent.some((q) => q.includes("name=pin_view") && q.includes("pin=pin-1"))).toBe(
     true,
   );
@@ -567,7 +591,7 @@ test("жалоба с чужой страницы доходит до сводк
     if (r.url().includes("/api/ev?")) sent.push(new URL(r.url()).search);
   });
 
-  await page.goto("/pin/pin-1", { waitUntil: "domcontentloaded" });
+  await open(page, "/pin/pin-1", { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Пожаловаться" }).click();
   await page.getByRole("menuitem", { name: "Спам или реклама" }).click();
   await expect
@@ -578,7 +602,7 @@ test("жалоба с чужой страницы доходит до сводк
   await expect(page.locator("main").getByText(/Отмечено:/)).toBeVisible();
 
   // сводка под замком: регистрируемся и читаем её тем же контекстом
-  await page.goto("/signup");
+  await open(page, "/signup");
   await page.getByLabel("Имя", { exact: true }).fill("Владелец Смоук");
   await page.getByLabel("Email", { exact: true }).fill(`owner${stamp}@example.test`);
   await page.getByLabel("Пароль", { exact: true }).fill("secret12345");
@@ -592,16 +616,16 @@ test("жалоба с чужой страницы доходит до сводк
 });
 
 test("режим «по фото» открывается из поиска и держит форму", async ({ page }) => {
-  await page.goto("/search?by=image");
+  await open(page, "/search?by=image");
   await expect(page.getByRole("heading", { level: 1, name: "Поиск по фото" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Добавить фото/ })).toBeVisible();
   // переключение режима не теряет набранный запрос
-  await page.goto("/search?q=sofa&by=image");
+  await open(page, "/search?q=sofa&by=image");
   await expect(page.getByRole("link", { name: "По тексту" })).toHaveAttribute("href", /q=sofa/);
 });
 
 test("поле, режим и источник фото — в одной строке, а не на разных концах экрана", async ({ page }) => {
-  await page.goto("/search?q=sofa");
+  await open(page, "/search?q=sofa");
   const field = page.getByLabel("Поиск пинов");
   await expect(field).toBeVisible();
   // в шапке поля больше нет: два одинаковых ввода на одной странице — это два
@@ -618,15 +642,16 @@ test("меню источников фото: камера, файл, буфер
   const menu = page.getByRole("menu");
   const trigger = page.getByRole("button", { name: /Добавить фото|Фото/ });
   // вход в режим по ссылке из шапки разворачивает меню без лишнего тапа
-  await page.goto("/search?by=image&pick=1");
+  await open(page, "/search?by=image&pick=1");
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: /Камера/ })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: /Файл с компьютера/ })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: /Из буфера обмена/ })).toBeVisible();
 
-  // Меню приехало с сервера уже открытым, поэтому первый клик обязателен: до
-  // гидрации слушателя Escape нет, и проверка «нажал Escape — закрылось»
-  // превращалась в гонку с загрузкой скрипта. Клик гидрацию вызывает сам.
+  // Меню открыто ещё на сервере, поэтому первый клик обязан его закрыть.
+  // Слушатели клика и Escape появляются только после гидрации — её уже
+  // дождался open(); без этого шага «нажал Escape — закрылось» превращалось
+  // в гонку с загрузкой скрипта.
   await trigger.click();
   await expect(menu).toHaveCount(0);
   // закрыли — флаг сбрасывается, чтобы перезагрузка не открывала меню заново
@@ -697,7 +722,7 @@ test("пин с видео и слайдами листается и не лом
   });
   expect(registered.ok()).toBe(true);
 
-  await page.goto("/pin/new");
+  await open(page, "/pin/new");
   await page.setInputFiles('input[type="file"]', [
     { name: "cover.png", mimeType: "image/png", buffer: TINY_PNG },
     { name: "clip.mp4", mimeType: "video/mp4", buffer: CLIP },
@@ -719,7 +744,7 @@ test("пин с видео и слайдами листается и не лом
   expect(og).not.toMatch(/\.mp4/);
 
   // Страница пина: перемотка и звук принадлежат человеку, открывшему работу.
-  await page.goto(`/pin/${pinId}`);
+  await open(page, `/pin/${pinId}`);
   // первый group на странице — сам пин; ниже лежит сетка «похожие пины», и
   // один из них — этот же пин по категории, поэтому .first(), а не unique
   const carousel = page.getByRole("group", { name: "Слайды: Слайд-шоу с видео" }).first();
@@ -770,7 +795,7 @@ test("пин с видео и слайдами листается и не лом
 
   // Карточка в ленте: тихо и по кругу, и высота ячейки не двигается от того,
   // что второй слайд другой пропорции — иначе masonry перетекает на листании.
-  await page.goto("/");
+  await open(page, "/");
   const card = page.getByRole("group", { name: "Слайды: Слайд-шоу с видео" }).first();
   await expect(card).toBeVisible();
   const cardVideo = card.locator("video");
