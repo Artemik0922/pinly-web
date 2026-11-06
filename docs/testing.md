@@ -11,6 +11,7 @@ npm run test:e2e           # Playwright: лента, регистрация, к�
 npm run ui:audit           # дизайн-система: ширины, радиусы, сетка, тап-цели,
                            #               кегль на 390 и 1280 (нужен запущенный сервер)
 npm run seo:report         # что краулер и мессенджер видят без JavaScript
+npm run perf:report        # LCP/FCP/CLS и байты на Pixel 7 + CPU×4 (нужен прод)
 npm run build              # продакшн-сборка
 ```
 

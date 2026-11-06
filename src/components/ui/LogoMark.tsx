@@ -5,10 +5,38 @@
 // Раньше здесь был SVG на currentColor (светлая/тёмная темы). У растровой
 // версии темы не нужно: светлое стекло читается и на белом, и на тёмном
 // фоне. Держим рядом favicon (src/app/favicon.ico) из того же файла.
+//
+// next/image, а не <img>: исходник — 512×512 RGBA на 186 КБ, а на экране это
+// 36 px в шапке и 64 px на заставке. Оптимизатор отдаёт AVIF/WebP нужной
+// ширины, и логотип перестает быть самым тяжёлым запросом каждой страницы
+// (замер — в docs/performance.md).
 
-export function LogoMark({ className = "" }: { className?: string }) {
+import Image from "next/image";
+
+// 64 px — самый крупный из двух размеров, в которых знак показывается;
+// дальше браузер сам выбирает плотность по DPR.
+const SIZES = "64px";
+
+export function LogoMark({
+  className = "",
+  priority = false,
+}: {
+  className?: string;
+  // На заставке знак и есть самый крупный элемент первого визита — замер
+  // LCP-элемента это показал. Для остальных мест (шапка) приоритет не нужен:
+  // картинка одна, и она уже в кэше.
+  priority?: boolean;
+}) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- маленькая статичная иконка: оптимизатор next/image не нужен
-    <img src="/logo-mark.png" alt="" className={className} draggable={false} />
+    <Image
+      src="/logo-mark.png"
+      alt=""
+      width={192}
+      height={192}
+      sizes={SIZES}
+      priority={priority}
+      draggable={false}
+      className={className}
+    />
   );
 }

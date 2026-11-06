@@ -55,7 +55,7 @@ export function Splash() {
     <>
       <div className="splash" aria-hidden="true">
         <span className="splash-badge">
-          <LogoMark className="splash-logo" />
+          <LogoMark className="splash-logo" priority />
         </span>
         <span className="splash-word">Pinly</span>
       </div>
