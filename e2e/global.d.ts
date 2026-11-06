@@ -2,7 +2,7 @@
 // не отдают — объявляем сами, ровно в объёме, который читаем.
 declare global {
   interface Window {
-    readonly __PINLY_HYDRATED?: boolean;
+    __PINLY_HYDRATED?: boolean;
   }
 }
 
